@@ -1,0 +1,5 @@
+name = "TraceSumMaximization"
+uuid = "673cdf0f-6752-4a08-b918-e94a550f1aff"
+keywords = ["maxbet", "maxdet", "", ""]
+authors = ["Joong-Ho Won <wonj@stats.snu.ac.kr>", "Hua Zhou <huazhou@ucla.edu>"]
+version = "0.0.1"
