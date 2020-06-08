@@ -1,2 +1,3 @@
-# TraceSumMaximization.jl
-algorithms for trace sum maximization 
+# OTSM.jl
+
+Algorithms for orthogonal trace sum maximization (OTSM).
