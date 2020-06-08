@@ -1,4 +1,4 @@
-using Convex, IterativeSolvers, LinearAlgebra
+using Convex, IterativeSolvers, LinearAlgebra, SCS
 import Base: cat
 import LinearAlgebra: BlasReal
 
@@ -97,7 +97,7 @@ end
 
 Maximize the trace sum `2 sum_{i<j} trace(Oi' * S[i, j] * Oj) = sum_{i≠j}
 trace(Oi' * S[i, j] * Oj)` subject to orthogonality constraint `Oi' * Oi
-== eye(r)` by block ascent algorithm. Each of `S[i, j]` for `i < j` is a
+== I(r)` by block ascent algorithm. Each of `S[i, j]` for `i < j` is a
 `di x dj` matrix.
 
 # Positional arguments
@@ -181,7 +181,7 @@ function tsm_ba(
     mul!(storage, S, O)
     tracesum::T = dot(O, storage)
     log && IterativeSolvers.shrink!(history)
-    O, obj, tracesum, history
+    O, tracesum, obj, history
 end
 
 # """
@@ -352,86 +352,89 @@ end
 #     O, obj, dot(O, S * O), isexact
 # end
 
-# """
-#     mts_sdp(S, r)
+"""
+    tsm_sdp(S, r)
 
-# Maximize the trace sum `2sum_{i<j} trace(Oi' * S[i, j] * Oj)` subject to
-# orthogonality constraint `Oi' * Oi == eye(r)` using a dual formulation of
-# Shapiro-Botha SDP relaxation. Each of `S[i, j]` for `i < j` is a `d x d` matrix.
-# """
-# function mts_sdp(
-#     S::Matrix{Matrix{T}},
-#     r::Integer;
-#     verbose::Bool = false,
-#     O::Union{Void, Vector{Matrix{T}}} = nothing
-#     ) where T <: Union{Float32, Float64}
+Maximize the trace sum `2sum_{i<j} trace(Oi' * S[i, j] * Oj)` subject to
+orthogonality constraint `Oi' * Oi == I(r)` using a dual formulation of
+Shapiro-Botha SDP relaxation. Each of `S[i, j]` for `i < j` is a `d x d` matrix.
 
-#     m = size(S, 1)
-#     d = [size(S[i, i], 1) for i in 1:m] # (d[i], d[j]) = size(S[i, j])
-#     # check (1) Sji = Sij, (2) Sii = 0
-#     verify_input_data!(S, r)
-#     S̃ = cat(S) # flattened matrix
-
-#     # form and solve the SDP
-#     U = Convex.Semidefinite(sum(d), sum(d))
-#     problem = Convex.maximize(m * trace(S̃ * U))
-#     for i in 1:m
-#         ir = (sum(d[1:i-1]) + 1):sum(d[1:i])
-#         problem.constraints += U[ir, ir] ⪯ eye(d[i]) / m
-#         problem.constraints += trace(U[ir, ir]) == r / m
-#     end
-#     if O == nothing
-#         solve!(problem)
-#     else
-#         E = cat(O)
-#         E .*= √m
-#         U.value = A_mul_Bt(E, E)
-#         solve!(problem, warmstart = true)
-#     end
-#     obj = problem.optval
-
-#     # retrieve solution to trace maximization problem
-#     #@show eigvals(Symmetric(U.value))
-#     # quick return if NAN in SDP solution
-#     if any(isnan.(U.value))
-#         O = [zeros(T, d[i], r) for i in 1:m]
-#         map!(Oi -> fill!(Oi, NaN), O)
-#         return O, obj, convert(T, NaN), false
-#     end
-#     Uchol = cholfact!(Symmetric(U.value), Val{true}; # Cholesky with pivoting
-#         tol = maximum(diag(U.value)) * 1e-3)
-#     if rank(Uchol) ≤ r
-#         isexact = true
-#         for i in 1:m
-#             ir = (sum(d[1:i-1]) + 1):sum(d[1:i])
-#             Uii = Symmetric(U.value[ir, ir])
-#             Uiichol = cholfact(Uii, Val{true}; tol = 1e-3maximum(diag(Uii)))
-#             if rank(Uiichol) > r
-#                 isexact = false; break
-#             end
-#         end
-#     else
-#         isexact = false
-#     end
-#     if verbose
-#         if isexact
-#             info("SDP solution solves the trace sum max problem exactly")
-#         else
-#             info("SDP solution solves the trace sum max problem approximately")
-#         end
-#     end
-#     E = Uchol[:L][invperm(Uchol.piv), 1:r]
-#     O = [zeros(T, d[i], r) for i in 1:m]
-#     # impove accuracy by SVD projection
-#     for i in 1:m
-#         ir = (sum(d[1:i-1]) + 1):sum(d[1:i])
-#         Eisvd = svdfact!(E[ir, :]; thin = true)
-#         A_mul_B!(O[i], Eisvd.U, Eisvd.Vt)
-#     end
-#     # fix identifiability and compute final trace sum objective
-#     identify!(O)
-#     O, obj, dot(O, S * O), isexact
-# end
+# Output
+`O::Vector{Matrix{T}}`: solution
+`tracesum::T`: trace sum at solution
+`obj::T`: SDP relaxation objective value at solution
+`isexaxt::Bool`: `true`=global optimality
+"""
+function tsm_sdp(
+    S       :: Matrix{Matrix{T}},
+    r       :: Integer;
+    verbose :: Bool = false,
+    O       :: Union{Nothing, Vector{Matrix{T}}} = nothing,
+    solver  = SCS.Optimizer()
+    ) where T <: BlasReal
+    m = size(S, 1)
+    d = [size(S[i, i], 1) for i in 1:m] # (d[i], d[j]) = size(S[i, j])
+    # check (1) Sji = Sij, (2) Sii = 0
+    verify_input_data!(S, r)
+    S̃ = cat(S) # flattened matrix
+    # form and solve the SDP
+    U       = Convex.Semidefinite(sum(d), sum(d))
+    problem = Convex.maximize(m * tr(S̃ * U))
+    for i in 1:m
+        ir = (sum(d[1:i-1]) + 1):sum(d[1:i])
+        problem.constraints += U[ir, ir] ⪯ I(d[i]) / m
+        problem.constraints += tr(U[ir, ir]) == r / m
+    end
+    if O === nothing
+        Convex.solve!(problem, () -> solver, verbose = verbose)
+    else
+        E   = cat(O)
+        E .*= √m 
+        mul!(U.value, E, transpose(E))
+        Convex.solve!(problem, () -> solver, verbose = verbose, warmstart = true)
+    end
+    obj = problem.optval
+    # retrieve solution to trace maximization problem
+    # quick return if NAN in SDP solution
+    if any(isnan.(U.value))
+        O = [fill(T(NaN), d[i], r) for i in 1:m]
+        return O, obj, T(NaN), false
+    end
+    Uchol = cholesky!(Symmetric(U.value), Val(true); # Cholesky with pivoting
+        check = false, tol = 1e-3maximum(diag(U.value)))
+    if rank(Uchol) ≤ r
+        isexact = true
+        for i in 1:m
+            ir      = (sum(d[1:i-1]) + 1):sum(d[1:i])
+            Uii     = Symmetric(U.value[ir, ir])
+            Uiichol = cholesky(Uii, Val(true); 
+                check = false, tol = 1e-3maximum(diag(Uii)))
+            if rank(Uiichol) > r
+                isexact = false; break
+            end
+        end
+    else
+        isexact = false
+    end
+    if verbose
+        if isexact
+            println("SDP solution solves the trace sum max problem exactly")
+        else
+            println("SDP solution solves the trace sum max problem approximately")
+        end
+    end
+    E = Uchol.L[invperm(Uchol.piv), 1:r]
+    O = [Matrix{T}(undef, d[i], r) for i in 1:m]
+    # impove accuracy by SVD projection
+    for i in 1:m
+        ir = (sum(d[1:i-1]) + 1):sum(d[1:i])
+        Eisvd = svd!(E[ir, :]; full = false)
+        mul!(O[i], Eisvd.U, Eisvd.Vt)
+    end
+    # fix identifiability and compute final trace sum objective
+    identify!(O)
+    O, dot(O, S * O), obj, isexact
+end
 
 """
 	testoptimality(O::Vector{Matrix}, S::Matrix{Matrix}, r::Integer; tol)
@@ -460,11 +463,8 @@ function testoptimality(
     for i in 1:m
         mul!(Λi, transpose(O[i]), SO[i])
         # check symmetry of Λi (first order optimality condition)
-        for r2 in 2:r, r1 in 1:r2-1
-            if abs(Λi[r1, r2] - Λi[r2, r1]) > abs(tol)
-                @warn "Λ$i not symmetric; first order optimality not satisfied"
-            end
-        end
+        check_symmetry(Λi) > abs(tol) && 
+            @warn "Λ$i not symmetric; first order optimality not satisfied"
 		λmin = eigmin(Symmetric(Λi))
         λmin < -abs(tol) && (return -1, -Inf)
         for j in 1:r
@@ -562,4 +562,18 @@ function init_sb(
 		rowoffset += di
 	end
 	return O
+end
+
+"""
+    check_symmetry(A)
+
+Return `norm(A - A')`. If the return value is close to 0, `A` is nearly symmetric. 
+"""
+function check_symmetry(A::AbstractMatrix)
+    @assert size(A, 1) == size(A, 2) "A is not square"
+    δ = zero(eltype(A))
+    @inbounds for j in 2:size(A, 2), i in 1:j-1
+        δ += abs2(A[i, j] - A[j, i])
+    end
+    sqrt(δ)
 end

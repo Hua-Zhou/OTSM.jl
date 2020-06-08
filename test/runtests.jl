@@ -1,7 +1,7 @@
 module PkgTest
 
 using BenchmarkTools, Statistics, Test, TraceSumMaximization
-
+using COSMO, SCS#, MosekTools
 
 function portwine_data()
     A1 = [
@@ -33,8 +33,8 @@ function portwine_data()
     for i in 1:m
         fill!(S[i, i], 0)
     end
-    tsm_optim = [419.6513374038389, 542.3275506362339, 568.1929048530802]
-    S, tsm_optim
+    ts_optim = [419.6513374038389, 542.3275506362339, 568.1929048530802]
+    S, ts_optim
 end
 
 @testset "cat" begin
@@ -47,19 +47,35 @@ A[2, 2] = [3 3]
 end
 
 @testset "tsm_ba" begin
-
-S, tsm_optim = portwine_data()
+S, ts_optim = portwine_data()
 for r in 1:3
     for init_fun in [init_eye, init_sb, init_tb]        
         @info "rank = $r, init = $init_fun"
-        @time Ô_ba, obj_ba, = tsm_ba(S, r; verbose = true, O = init_fun(S, r))
-        @test obj_ba ≈ tsm_optim[r]
+        @time Ô_ba, ts_ba, = tsm_ba(S, r; verbose = true, O = init_fun(S, r))
+        @show ts_ba
+        @test ts_ba ≈ ts_optim[r]
         @test testoptimality(Ô_ba, S)[1] == 1
     end
 end
-
 # bm = @benchmark tsm_ba(S, 1)
 # display(bm); println()
+end
+
+@testset "SDP relaxation" begin
+S, ts_optim = portwine_data()
+r = 1
+for r in 1:3
+    for solver in [#Mosek.Optimizer(LOG=0),
+        COSMO.Optimizer(max_iter=5000, verbose=false),
+        SCS.Optimizer(verbose=0)
+        ]
+        @info "rank = $r, solver = $solver"
+        @time Ô_sdp, ts_sdp, = tsm_sdp(S, r, solver = solver)
+        @show ts_sdp
+        @test ts_sdp ≈ ts_optim[r]
+        @test testoptimality(Ô_sdp, S)[1] == 1
+    end
+end
 end
 
 end # PkgTest module
