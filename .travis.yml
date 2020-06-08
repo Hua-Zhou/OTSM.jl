@@ -1,0 +1,31 @@
+language: julia
+os:
+  - linux
+  - osx
+  - windows
+julia:
+  - 1.0
+  - 1.4
+  - nightly
+notifications:
+  email: false
+git:
+  depth: 99999999
+
+after_script:
+  - julia -e 'using Pkg, OTSM; cd(joinpath(dirname(pathof(OTSM)), "..")); Pkg.add("Coverage"); using Coverage; Codecov.submit(process_folder()); Coveralls.submit(process_folder())'
+
+jobs:
+  allow_failures:
+    - julia: nightly    
+    - os: windows
+  include:
+    - stage: "Documentation"
+      julia: 1.4
+      os: osx
+      script:
+        - julia -e 'using Pkg; Pkg.add("Documenter")'
+        - julia -e 'using OTSM; include(joinpath(dirname(pathof(OTSM)), "..", "docs", "make.jl"))'
+      after_script: skip
+      after_success: skip  
+      
