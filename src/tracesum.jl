@@ -37,8 +37,8 @@ function verify_input_data!(
 	@inbounds for i in 1:m
 		@assert r ≤ size(S[i, i], 1) "rank r > size(S[$i, $i], 1) !"
 		fill!(S[i, i], 0)
-		for j in (i + 1):m
-			copy!(S[j, i], S[i, j]')
+        for j in (i + 1):m
+            S[j, i] .= transpose(S[i, j])
 		end
 	end
 	S, r
