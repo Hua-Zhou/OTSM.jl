@@ -2,18 +2,6 @@ using Convex, IterativeSolvers, LinearAlgebra, SCS
 import Base: cat
 import LinearAlgebra: BlasReal
 
-# using SCS
-# solver = SCSSolver(verbose=1, warm_start=1, max_iters=2500)
-# set_default_solver(solver)
-
-# using CSDP
-# set_default_solver(CSDPSolver(printlevel=1))
-
-# Use Mosek solver
-# using Mosek
-# solver = MosekSolver(LOG = 0)
-# set_default_solver(solver)
-
 """
 	cat(A::Matrix{Matrix{T}})
 
@@ -93,44 +81,43 @@ function identify!(O::Array{Matrix{T}}) where T
 end
 
 """
-    tsm_ba(S, r)
+    otsm_pba(S, r)
 
 Maximize the trace sum `2 sum_{i<j} trace(Oi' * S[i, j] * Oj) = sum_{i≠j}
 trace(Oi' * S[i, j] * Oj)` subject to orthogonality constraint `Oi' * Oi
-== I(r)` by block ascent algorithm. Each of `S[i, j]` for `i < j` is a
+== I(r)` by a proximal block ascent algorithm. Each of `S[i, j]` for `i < j` is a
 `di x dj` matrix.
 
 # Positional arguments
-- `S::Matrix{Matrix}`: `S[i, j]` is a `di x dj` matrix.
-- `r::Integer`: rank of solution.
+- `S       :: Matrix{Matrix}`: `S[i, j]` is a `di x dj` matrix.
+- `r       :: Integer`       : rank of solution.
 
 # Keyword arguments
-- `ialpha::Number`: proximal update constant 1/\alpha, default is `1e-3`.
-- `maxiter::Integer`: maximum number of iterations, default is 1000.
-- `tolfun::Number`: tolerance for objective convergence, default is `1e-8`.
-- `tolvar::Number`: tolerance for iterate convergence, default is `1e-4`.
-- `verbose::Bool`: verbose display, default is `false`.
-- `O::Vector{Matrix}`: starting point, default is `O[i] = eye(di, r)`.
-- `log::Bool`: record iterate history or not, defaut is `false`.
+- `αinv    :: Number`: proximal update constant 1/\alpha, default is `1e-3`.
+- `maxiter :: Integer`: maximum number of iterations, default is 1000.
+- `tolfun  :: Number`: tolerance for objective convergence, default is `1e-8`.
+- `tolvar  :: Number`: tolerance for iterate convergence, default is `1e-6`.
+- `verbose :: Bool`  : verbose display, default is `false`.
+- `O       :: Vector{Matrix}`: starting point, default is `O[i] = eye(di, r)`.
+- `log     :: Bool`: record iterate history or not, defaut is `false`.
 
 # Output
-- `O::Vector{Matrix}`: result, `O[i]` has dimension `di x r`.
-- `obj`: final objective value from block ascent algorithm.
+- `O`       : result, `O[i]` has dimension `di x r`.
 - `tracesum`: objective value evaluated at final `O`.
-- `history`: iterate history.
+- `obj`     : final objective value from PBA algorithm, should be same as `obj`.
+- `history` : iterate history.
 """
-function tsm_ba(
+function otsm_pba(
     S       :: Matrix{Matrix{T}},
     r       :: Integer;
-	ialpha  :: Number  = 1e-3,
+	αinv    :: Number  = 1e-3,
     maxiter :: Integer = 1000,
     tolfun  :: Number  = 1e-8,
-    tolvar  :: Number  = 1e-4,
+    tolvar  :: Number  = 1e-6,
     verbose :: Bool    = false,
     log     :: Bool    = false,
-    O       :: Vector{Matrix{T}} = init_eye(S, r),
+    O       :: Vector{Matrix{T}} = init_eye(S, r)
     ) where T <: BlasReal
-
     m = size(S, 1)
     d = [size(S[i, i], 1) for i in 1:m] # (d[i], d[j]) = size(S[i, j])
     # record iterate history if requested
@@ -142,20 +129,22 @@ function tsm_ba(
     # check (1) Sji = Sij', (2) Sii = 0
     verify_input_data!(S, r)
     # initial objective value
-    storage = S * O # storage[i] = sum_{j≠i} S_{ij} O_j
-    obj::T  = dot(O, storage)
+    SO      = S * O # SO[i] = sum_{j≠i} S_{ij} O_j
+    obj::T  = dot(O, SO)
     IterativeSolvers.nextiter!(history)
     push!(history, :tracesum, obj)
     # pre-allocate intermediate arrays
     ΔO  = [similar(O[i]) for i in 1:m]
     tmp = [similar(O[i]) for i in 1:m]
+    Λi  = Matrix{T}(undef, r, r) # Lagrange multipliers
     for iter in 1:maxiter-1
         IterativeSolvers.nextiter!(history)
         verbose && println("iter = $iter, obj = $obj")
         # block update
         @inbounds for i in 1:m
             # update Oi
-            BLAS.axpy!(ialpha, O[i], copy!(tmp[i], storage[i]))
+            # tmp[i] = SO[i] + αinv * O[i]
+            BLAS.axpy!(αinv, O[i], copy!(tmp[i], SO[i]))
             Fi = svd!(tmp[i]; full = false)
             copy!(ΔO[i], O[i])
             mul!(O[i], Fi.U, Fi.Vt)
@@ -163,23 +152,24 @@ function tsm_ba(
             # update storage[j], j ≠ i
             for j in 1:m
                 j ≠ i &&
-                BLAS.gemm!('N', 'N', T(1), S[j, i], ΔO[i], T(1), storage[j])
+                BLAS.gemm!('N', 'N', T(1), S[j, i], ΔO[i], T(1), SO[j])
             end
         end
         objold  = obj
-        obj     = dot(O, storage)
+        obj     = dot(O, SO)
         vchange = sum(norm, ΔO) / m # mean Frobenius norm of variable change
         push!(history, :tracesum,     obj)
         push!(history, :vchange , vchange)
-		if (vchange < tolvar) && (abs(obj - objold) < tolfun * abs(objold + 1))
+        if (vchange < tolvar) && 
+            (abs(obj - objold) < tolfun * abs(objold + 1)) &&
             IterativeSolvers.setconv(history, true)
             break
         end
     end
     # fix identifiability and compute final trace sum objective
     identify!(O)
-    mul!(storage, S, O)
-    tracesum::T = dot(O, storage)
+    mul!(SO, S, O)
+    tracesum::T = dot(O, SO)
     log && IterativeSolvers.shrink!(history)
     O, tracesum, obj, history
 end
@@ -353,19 +343,19 @@ end
 # end
 
 """
-    tsm_sdp(S, r)
+    otsm_sdp(S, r)
 
 Maximize the trace sum `2sum_{i<j} trace(Oi' * S[i, j] * Oj)` subject to
-orthogonality constraint `Oi' * Oi == I(r)` using a dual formulation of
-Shapiro-Botha SDP relaxation. Each of `S[i, j]` for `i < j` is a `d x d` matrix.
+orthogonality constraint `Oi' * Oi == I(r)` using an SDP relaxation (P-SDP in 
+the manuscript). Each of `S[i, j]` for `i < j` is a `di x dj` matrix.
 
 # Output
-`O::Vector{Matrix{T}}`: solution
-`tracesum::T`: trace sum at solution
-`obj::T`: SDP relaxation objective value at solution
-`isexaxt::Bool`: `true`=global optimality
+- `O`       : solution.
+- `tracesum`: trace sum at solution.
+- `obj`     : SDP relaxation objective value at solution.
+- `isexaxt` : `true` means global optimality.
 """
-function tsm_sdp(
+function otsm_sdp(
     S       :: Matrix{Matrix{T}},
     r       :: Integer;
     verbose :: Bool = false,
@@ -437,19 +427,23 @@ function tsm_sdp(
 end
 
 """
-	testoptimality(O::Vector{Matrix}, S::Matrix{Matrix}, r::Integer; tol)
+	test_optimality(O::Vector{Matrix}, S::Matrix{Matrix}; tol)
 
 Test if the vector of orthogonal matrices `O` is globally optimal. The `O` is 
 assumed to satisfy the first-order optimality conditions. Each of `O[i]` is a 
-`d_i x r` matrix. Each of `S[i, j]` for `i < j` is a `d_i x d_j` matrix. 
+`d_i x r` matrix. Each of `S[i, j]` for `i < j` is a `di x dj` matrix. 
 Tolerance `tol` is used to test the positivity of the smallest eigenvalue
 of the test matrix.
 
+# Positional arguments
+- `O :: Vector{Matrix}`: a solution that satisifies 1st order optimality.
+- `S :: Matrix{Matrix}`: data matrix.
+
 # Output
-`z`  : 1=globally optimal; 0=undecided; -1=suboptimal.
-`val`: smallest eigenvalue of the test matrix if `z=1` or `0`; `-Inf` otherwise.
+- `z`  : 1=globally optimal; 0=undecided; -1=suboptimal.
+- `val`: smallest eigenvalue of the test matrix if `z=1` or `0`; `-Inf` otherwise.
 """
-function testoptimality(
+function test_optimality(
     O   :: Vector{Matrix{T}},
     S   :: Matrix{Matrix{T}},
 	tol :: Number = 1e-3
@@ -460,11 +454,13 @@ function testoptimality(
     m  = size(S, 1)
     SO = S * O 	# SO[i] = sum_{j≠i} S_{ij} O_j
 	Λi = Matrix{T}(undef, r, r)
-    for i in 1:m
+    @inbounds for i in 1:m
         mul!(Λi, transpose(O[i]), SO[i])
         # check symmetry of Λi (first order optimality condition)
-        check_symmetry(Λi) > abs(tol) && 
-            @warn "Λ$i not symmetric; first order optimality not satisfied"
+        δi = check_symmetry(Λi) 
+        δi > abs(tol) && 
+            @warn "Λ$i not symmetric; norm(Λ - Λ') = $δi; " *
+            "first order optimality not satisfied"
 		λmin = eigmin(Symmetric(Λi))
         λmin < -abs(tol) && (return -1, -Inf)
         for j in 1:r
@@ -497,8 +493,8 @@ end
 
 Compute initial point following Ten Berge's second upper bound (p. 273).
 Take the eigenvectors corresponding to the r largest eigenvalues of S.
-This is a `D x r` orthogonal matrix, D=sum_{i=1}^m d_i.
-For each `d_i x r` block, project to the Stiefel manifold.
+This is a `D x r` orthogonal matrix, D=sum_{i=1}^m di.
+For each `di x r` block, project to the Stiefel manifold.
 These blocks constitute an initial point.
 """
 function init_tb(
