@@ -485,7 +485,7 @@ function init_eye(
     S :: Matrix{Matrix{T}},
     r :: Integer
     ) where T <: BlasReal
-    O = [zeros(size(S[i, i], 1), r) for i in 1:size(S, 1)]
+    O = [zeros(T, size(S[i, i], 1), r) for i in 1:size(S, 1)]
     for Oi in O
         for i in 1:r
             Oi[i, i] = 1
