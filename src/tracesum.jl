@@ -372,7 +372,8 @@ function otsm_sdp(
     problem = Convex.maximize(m * tr(S̃ * U))
     for i in 1:m
         ir = (sum(d[1:i-1]) + 1):sum(d[1:i])
-        problem.constraints += U[ir, ir] ⪯ I(d[i]) / m
+        #problem.constraints += U[ir, ir] ⪯ I(d[i]) / m
+        problem.constraints += eigmax(U[ir, ir]) <= inv(m)
         problem.constraints += tr(U[ir, ir]) == r / m
     end
     if O === nothing
