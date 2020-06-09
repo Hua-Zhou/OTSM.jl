@@ -1,9 +1,9 @@
 # OTSM.jl
 
 OTSM.jl implements algorithms for solving the orthogonal trace sum maximization (OTSM) problem
-$$
-    \operatorname{maximize} \sum_{i,j=1}^m \operatorname{tr} (O_i^T S_{ij} O_j)
-$$
+  
+$\operatorname{maximize} \sum_{i,j=1}^m \operatorname{tr} (O_i^T S_{ij} O_j)$
+
 subject to orthogonality constraint $O_i^T O_i = I_r$. Here $S_{i,j} \in \mathbb{R}^{d_i \times d_j}$, $1 \le i, j \le m$, are data matrices. Many problems such as canonical correlation analysis (CCA) with $m \ge 2$ data sets, Procrustes analysis with $m \ge 2$ images, and orthogonal least squares are special cases of OSTM. 
 
 Details on OTSM are described in paper: 
@@ -114,9 +114,9 @@ end
 
 
 The MAXDIFF approach for CCA seeks the rotations of $A_i$ that achieve the maximal agreement
-$$
-\operatorname{maximize} \sum_{i < j} \operatorname{tr} (O_i^T A_i^T A_j O_j),
-$$
+
+$\operatorname{maximize} \sum_{i < j} \operatorname{tr} (O_i^T A_i^T A_j O_j),$
+
 subject to constraint $O_i^T O_i = I_r$. This corresponds to an OTSM problem with $S_{ij} = A_i^T A_j$ and $S_{ii} = 0$.
 
 
@@ -219,8 +219,7 @@ The `otsm_bpa()` function implements an efficient local search algorithm for sol
 
 
 For documentation of the `otsm_bpa()` function, type ?otsm_bpa in Julia REPL.
-```
-@docs
+```@docs
 otsm_bpa
 ```
 
@@ -246,7 +245,6 @@ test_optimality(Ô_pba, S)[1]
 
 
 For documentation of the `test_optimality()` function, type `?test_optimality` in Julia REPL.
-```
-@docs
+```@docs
 test_optimality
 ```
