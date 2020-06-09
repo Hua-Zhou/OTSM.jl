@@ -49,7 +49,7 @@ using OTSM
 
 ## Example data
 
-The package contains one port wine example data set from the [Hanafi and Kiers (200)](https://doi.org/10.1016/j.csda.2006.04.020) paper. It can be retrieved by the `portwine_data()` function.
+The package contains the port wine example data set from the [Hanafi and Kiers (200)](https://doi.org/10.1016/j.csda.2006.04.020) paper. It can be retrieved by the `portwine_data()` function.
 
 
 ```julia
@@ -202,7 +202,7 @@ end
 
 ## Proximal block ascent algorithm
 
-The `otsm_bpa()` function implements an efficient local search algorithm for solving OTSM.
+The `otsm_pba()` function implements an efficient local search algorithm for solving OTSM.
 
 
 ```julia
@@ -218,9 +218,9 @@ The `otsm_bpa()` function implements an efficient local search algorithm for sol
     iter = 7, obj = 542.327550638136
 
 
-For documentation of the `otsm_bpa()` function, type ?otsm_bpa in Julia REPL.
+For documentation of the `otsm_pba()` function, type ?otsm_bpa in Julia REPL.
 ```@docs
-otsm_bpa
+otsm_pba
 ```
 
 ## Check global optimality of a local solution
