@@ -11,5 +11,5 @@ The Julia package OTSM.jl implements a few algorithms for the orthogonal trace s
 
 OTSM.jl supports Julia v1.0 or later. See documentation for usage. It is not yet registered and can be installed, in the Julia Pkg mode, by
 ```{julia}
-Pkg> add https://github.com/Hua-Zhou/OTSM.jl.git
+(@v1.4) Pkg> add https://github.com/Hua-Zhou/OTSM.jl
 ```

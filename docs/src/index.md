@@ -19,7 +19,7 @@ This package requires Julia v1.0 or later, which can be obtained from
 The package has not yet been registered and must be installed using the repository location.
 Start julia and use the `]` key to switch to the package manager REPL
 ```julia
-(@v1.4) pkg> add https://github.com/Hua-Zhou/OTSM.jl.git
+(@v1.4) pkg> add https://github.com/Hua-Zhou/OTSM.jl
 ```
 Use the backspace key to return to the Julia REPL.
 
