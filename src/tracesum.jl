@@ -93,8 +93,8 @@ trace(Oi' * S[i, j] * Oj)` subject to orthogonality constraint `Oi' * Oi
 - `r       :: Integer`       : rank of solution.
 
 # Keyword arguments
-- `αinv    :: Number`: proximal update constant 1/\alpha, default is `1e-3`.
-- `maxiter :: Integer`: maximum number of iterations, default is 1000.
+- `αinv    :: Number`: proximal update constant ``1/α```, default is `1e-3`.
+- `maxiter :: Integer`: maximum number of iterations, default is `1000`.
 - `tolfun  :: Number`: tolerance for objective convergence, default is `1e-8`.
 - `tolvar  :: Number`: tolerance for iterate convergence, default is `1e-6`.
 - `verbose :: Bool`  : verbose display, default is `false`.
@@ -116,7 +116,7 @@ function otsm_pba(
     tolvar  :: Number  = 1e-6,
     verbose :: Bool    = false,
     log     :: Bool    = false,
-    O       :: Vector{Matrix{T}} = init_eye(S, r)
+    O       :: Vector{Matrix{T}} = init_tb(S, r)
     ) where T <: BlasReal
     m = size(S, 1)
     d = [size(S[i, i], 1) for i in 1:m] # (d[i], d[j]) = size(S[i, j])
@@ -160,11 +160,10 @@ function otsm_pba(
         vchange = sum(norm, ΔO) / m # mean Frobenius norm of variable change
         push!(history, :tracesum,     obj)
         push!(history, :vchange , vchange)
-        if (vchange < tolvar) && 
-            (abs(obj - objold) < tolfun * abs(objold + 1)) &&
-            IterativeSolvers.setconv(history, true)
-            break
-        end
+        (vchange < tolvar) && 
+        (abs(obj - objold) < tolfun * abs(objold + 1)) &&
+        IterativeSolvers.setconv(history, true) &&
+        break
     end
     # fix identifiability and compute final trace sum objective
     identify!(O)
@@ -345,9 +344,10 @@ end
 """
     otsm_sdp(S, r)
 
-Maximize the trace sum `2sum_{i<j} trace(Oi' * S[i, j] * Oj)` subject to
+Maximize the trace sum `2sum_{i<j} trace(Oi' * S[i, j] * Oj)` subject to the
 orthogonality constraint `Oi' * Oi == I(r)` using an SDP relaxation (P-SDP in 
-the manuscript). Each of `S[i, j]` for `i < j` is a `di x dj` matrix.
+the manuscript). Each of `S[i, j]` for `i < j` is a `di x dj` matrix and 
+`S[i, j] = S[j, i]'`.
 
 # Output
 - `O`       : solution.
@@ -432,12 +432,12 @@ end
 
 Test if the vector of orthogonal matrices `O` is globally optimal. The `O` is 
 assumed to satisfy the first-order optimality conditions. Each of `O[i]` is a 
-`d_i x r` matrix. Each of `S[i, j]` for `i < j` is a `di x dj` matrix. 
+`di x r` matrix. Each of `S[i, j]` for `i < j` is a `di x dj` matrix. 
 Tolerance `tol` is used to test the positivity of the smallest eigenvalue
 of the test matrix.
 
 # Positional arguments
-- `O :: Vector{Matrix}`: a solution that satisifies 1st order optimality.
+- `O :: Vector{Matrix}`: a point satisifying the 1st order optimality.
 - `S :: Matrix{Matrix}`: data matrix.
 
 # Output
@@ -500,7 +500,7 @@ end
 
 Compute initial point following Ten Berge's second upper bound (p. 273).
 Take the eigenvectors corresponding to the r largest eigenvalues of S.
-This is a `D x r` orthogonal matrix, D=sum_{i=1}^m di.
+This is a `D x r` orthogonal matrix, ``D=\\sum_{i=1}^m d_i``.
 For each `di x r` block, project to the Stiefel manifold.
 These blocks constitute an initial point.
 """
@@ -526,13 +526,12 @@ end
 """
 	init_sb(S, r)
 
-Compute initial point following Shapiro-Botha (p. 380).
-Fill in the diagonal block of S with -\\sum_{j \\neq i} P_ij * D_ij * P_ij',
-where P_ij*D_ij*Q_ij' is the SVD of S_ij.
-The resulting matrix is negative semidefinite.
-Take the eigenvectors corresponding to the r largest eigenvalues.
-This is a D*r orthogonal matrix, D=sum_{i=1}^m d_i.
-For each d_i*r block, project to the Stiefel manifold.
+Compute initial point following Shapiro-Botha (p. 380). Fill in the diagonal 
+block of `S` with ``-\\sum_{j \\neq i} P_{ij} * D_{ij} * P_{ij}``, where 
+``P_{ij} * D_{ij} * Q_{ij}`` is the SVD of ``S_{ij}``. The resulting matrix is 
+negative semidefinite. Take the eigenvectors corresponding to the `r` largest 
+eigenvalues. This is a `D x r` orthogonal matrix, ``D=\\sum_{i=1}^m d_i``.
+For each `di x r` block, project to the Stiefel manifold.
 These blocks constitute an initial point.
 """
 function init_sb(
