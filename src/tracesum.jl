@@ -57,7 +57,7 @@ function identify!(O::Array{Matrix{T}}) where T
     tmp = [similar(O[i]) for i in 1:m]
     if size(O[end], 1) == size(O[end], 2) # O[end] is orthogonal matrix
         @inbounds for i in 1:(length(O) - 1)
-            copy!(tmp[i], O[i])
+            copyto!(tmp[i], O[i])
             mul!(O[i], tmp[i], transpose(O[end]))
         end
         fill!(O[end], 0)
@@ -69,11 +69,11 @@ function identify!(O::Array{Matrix{T}}) where T
         ds   = sign.(diag(L))  # sign of diagonal of L
         rmul!(L, Diagonal(ds)) # make diagonal entries of L to be positive
         @inbounds for i in 1:(m - 1)
-            copy!(tmp[i], O[i])
+            copyto!(tmp[i], O[i])
             mul!(O[i], tmp[i], transpose(Q))
             rmul!(O[i], Diagonal(ds))
         end
-        copy!(O[end], L)
+        copyto!(O[end], L)
     else
         error("O[end] should have more rows than columns")
     end
@@ -144,9 +144,9 @@ function otsm_pba(
         @inbounds for i in 1:m
             # update Oi
             # tmp[i] = SO[i] + αinv * O[i]
-            BLAS.axpy!(αinv, O[i], copy!(tmp[i], SO[i]))
+            BLAS.axpy!(αinv, O[i], copyto!(tmp[i], SO[i]))
             Fi = svd!(tmp[i]; full = false)
-            copy!(ΔO[i], O[i])
+            copyto!(ΔO[i], O[i])
             mul!(O[i], Fi.U, Fi.Vt)
             ΔO[i] .= O[i] .- ΔO[i]
             # update storage[j], j ≠ i
