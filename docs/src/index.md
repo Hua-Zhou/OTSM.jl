@@ -209,13 +209,13 @@ The `otsm_pba()` function implements an efficient local search algorithm for sol
 Ô_pba, ts_pba, obj, history = otsm_pba(S, 2; verbose = true);
 ```
 
-    iter = 1, obj = 110.25
-    iter = 2, obj = 533.6042318034453
-    iter = 3, obj = 542.2027792984238
-    iter = 4, obj = 542.3265730402211
-    iter = 5, obj = 542.3275463498419
-    iter = 6, obj = 542.3275506295132
-    iter = 7, obj = 542.327550638136
+    iter = 1, obj = 539.8501989834106
+    iter = 2, obj = 542.2346791607897
+    iter = 3, obj = 542.326755374587
+    iter = 4, obj = 542.3275270111226
+    iter = 5, obj = 542.327550329459
+    iter = 6, obj = 542.3275506362339
+    iter = 7, obj = 542.3275506383457
 
 
 For documentation of the `otsm_pba()` function, type ?otsm_bpa in Julia REPL.
@@ -226,9 +226,9 @@ otsm_pba
 ## Check global optimality of a local solution
 
 The `test_optimality()` function attempts to certify whether a local solution `O::Vector{Matrix}` is a global solution. By a local solution, we mean a point that satifies the first order optimality condition:
-$$
-\Lambda_i = \sum_{j \ne i} O_i^T S_{ij} O_j
-$$
+
+$\Lambda_i = \sum_{j \ne i} O_i^T S_{ij} O_j$
+
 is symmetric for $i=1,\ldots,m$. The first output indicates the solution is global optimal (1), or uncertain (0), or suboptimal (-1).
 
 
