@@ -116,7 +116,7 @@ function otsm_pba(
     tolvar  :: Number  = 1e-6,
     verbose :: Bool    = false,
     log     :: Bool    = false,
-    O       :: Vector{Matrix{T}} = init_tb(S, r)
+    O       :: Vector{Matrix{T}} = init_eye(S, r)
     ) where T <: BlasReal
     m = size(S, 1)
     d = [size(S[i, i], 1) for i in 1:m] # (d[i], d[j]) = size(S[i, j])
