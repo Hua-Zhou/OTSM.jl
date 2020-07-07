@@ -23,20 +23,23 @@ function Base.cat(A::VecOrMat{Matrix{T}}) where T
 end
 
 """
-	verify_input_data!(S, r)
+	verify_input_data!(S, r, make_Sii_zero = true)
 
-`S` is an array of matrices. Enforce `S[i, j] = S[j, i]'` and `S[i, i] == 0`
-and check `r` is less than `size(S[i, j], 1)`.
+`S` is an array of matrices. Enforce `S[j, i] = S[i, j]'`, `i < j`, (copy 
+upper triangular blocks `S[i, j]`, `i < j`, to lower triangular blocks) and
+check `r` is less than `size(S[i, j], 1)`. If `make_Sii_zero = true`, fill 
+diagonal blocsk `S[i, i]` by zeros. This is useful in certain applications.
 """
 function verify_input_data!(
-	S :: AbstractMatrix{<:AbstractMatrix},
-	r :: Integer
+	S             :: AbstractMatrix{<:AbstractMatrix},
+    r             :: Integer,
+    make_Sii_zero :: Bool = true
 	)
 	@assert size(S, 1) == size(S, 2) "size(S, 1) should be equal to size(S, 2)"
 	m = size(S, 1)
 	@inbounds for i in 1:m
 		@assert r ≤ size(S[i, i], 1) "rank r > size(S[$i, $i], 1) !"
-		fill!(S[i, i], 0)
+		make_Sii_zero == true && fill!(S[i, i], 0)
         for j in (i + 1):m
             S[j, i] .= transpose(S[i, j])
 		end
@@ -83,13 +86,14 @@ end
 """
     otsm_pba(S, r)
 
-Maximize the trace sum `2 sum_{i<j} trace(Oi' * S[i, j] * Oj) = sum_{i≠j}
-trace(Oi' * S[i, j] * Oj)` subject to orthogonality constraint `Oi' * Oi
-== I(r)` by a proximal block ascent algorithm. Each of `S[i, j]` for `i < j` is a
-`di x dj` matrix.
+Maximize the trace sum `sum_{i,j} trace(Oi' * S[i, j] * Oj) = trace(O' * S * O)` 
+subject to  orthogonality constraint `Oi' * Oi == I(r)` by a 
+proximal block ascent algorithm. Each of `S[i, j]` for `i < j` is a
+`di x dj` matrix, `S[i, i]` are symmetric, and `S[i, j] = S[j, i]'`.
 
 # Positional arguments
-- `S       :: Matrix{Matrix}`: `S[i, j]` is a `di x dj` matrix.
+- `S       :: Matrix{Matrix}`: `S[i, j]` is a `di x dj` matrix, `S[i, i]` are
+symmetric, and `S[j, i] = S[i, j]'`.
 - `r       :: Integer`       : rank of solution.
 
 # Keyword arguments
@@ -108,15 +112,15 @@ trace(Oi' * S[i, j] * Oj)` subject to orthogonality constraint `Oi' * Oi
 - `history` : iterate history.
 """
 function otsm_pba(
-    S       :: Matrix{Matrix{T}},
-    r       :: Integer;
-	αinv    :: Number  = 1e-3,
-    maxiter :: Integer = 1000,
-    tolfun  :: Number  = 1e-8,
-    tolvar  :: Number  = 1e-6,
-    verbose :: Bool    = false,
-    log     :: Bool    = false,
-    O       :: Vector{Matrix{T}} = init_eye(S, r)
+    S        :: Matrix{Matrix{T}},
+    r        :: Integer;
+	αinv     :: Number  = 1e-3,
+    maxiter  :: Integer = 1000,
+    tolfun   :: Number  = 1e-8,
+    tolvar   :: Number  = 1e-6,
+    verbose  :: Bool    = false,
+    log      :: Bool    = false,
+    O        :: Vector{Matrix{T}} = init_eye(S, r)
     ) where T <: BlasReal
     m = size(S, 1)
     d = [size(S[i, i], 1) for i in 1:m] # (d[i], d[j]) = size(S[i, j])
@@ -126,8 +130,6 @@ function otsm_pba(
     history[:tolvar] = tolvar
     IterativeSolvers.reserve!(T, history, :tracesum, maxiter)
     IterativeSolvers.reserve!(T, history, :vchange , maxiter)
-    # check (1) Sji = Sij', (2) Sii = 0
-    verify_input_data!(S, r)
     # initial objective value
     SO      = S * O # SO[i] = sum_{j≠i} S_{ij} O_j
     obj::T  = dot(O, SO)
@@ -149,9 +151,8 @@ function otsm_pba(
             copyto!(ΔO[i], O[i])
             mul!(O[i], Fi.U, Fi.Vt)
             ΔO[i] .= O[i] .- ΔO[i]
-            # update storage[j], j ≠ i
+            # update SO[j], j ≠ i
             for j in 1:m
-                j ≠ i &&
                 BLAS.gemm!('N', 'N', T(1), S[j, i], ΔO[i], T(1), SO[j])
             end
         end
@@ -171,6 +172,153 @@ function otsm_pba(
     tracesum::T = dot(O, SO)
     log && IterativeSolvers.shrink!(history)
     O, tracesum, obj, history
+end
+
+"""
+    otsm_sdp(S, r)
+
+Maximize the trace sum `2sum_{i<j} trace(Oi' * S[i, j] * Oj)` subject to the
+orthogonality constraint `Oi' * Oi == I(r)` using an SDP relaxation (P-SDP in 
+the manuscript). Each of `S[i, j]` for `i < j` is a `di x dj` matrix and 
+`S[i, j] = S[j, i]'`.
+
+# Output
+- `O`       : solution.
+- `tracesum`: trace sum at solution.
+- `obj`     : SDP relaxation objective value at solution.
+- `isexaxt` : `true` means global optimality.
+"""
+function otsm_sdp(
+    S       :: Matrix{Matrix{T}},
+    r       :: Integer;
+    verbose :: Bool = false,
+    O       :: Union{Nothing, Vector{Matrix{T}}} = nothing,
+    solver  = SCS.Optimizer()
+    ) where T <: BlasReal
+    m = size(S, 1)
+    d = [size(S[i, i], 1) for i in 1:m] # (d[i], d[j]) = size(S[i, j])
+    S̃ = cat(S) # flattened matrix
+    # form and solve the SDP
+    U       = Convex.Semidefinite(sum(d), sum(d))
+    problem = Convex.maximize(m * tr(S̃ * U))
+    for i in 1:m
+        ir = (sum(d[1:i-1]) + 1):sum(d[1:i])
+        #problem.constraints += U[ir, ir] ⪯ I(d[i]) / m
+        problem.constraints += eigmax(U[ir, ir]) <= inv(m)
+        problem.constraints += tr(U[ir, ir]) == r / m
+    end
+    if O === nothing
+        Convex.solve!(problem, () -> solver, verbose = verbose)
+    else
+        E   = cat(O)
+        E .*= √m 
+        mul!(U.value, E, transpose(E))
+        Convex.solve!(problem, () -> solver, verbose = verbose, warmstart = true)
+    end
+    obj = problem.optval
+    # retrieve solution to trace maximization problem
+    # quick return if NAN in SDP solution
+    if any(isnan.(U.value))
+        O = [fill(T(NaN), d[i], r) for i in 1:m]
+        return O, obj, T(NaN), false
+    end
+    Uchol = cholesky!(Symmetric(U.value), Val(true); # Cholesky with pivoting
+        check = false, tol = 1e-3maximum(diag(U.value)))
+    if rank(Uchol) ≤ r
+        isexact = true
+        for i in 1:m
+            ir      = (sum(d[1:i-1]) + 1):sum(d[1:i])
+            Uii     = Symmetric(U.value[ir, ir])
+            Uiichol = cholesky(Uii, Val(true); 
+                check = false, tol = 1e-3maximum(diag(Uii)))
+            if rank(Uiichol) > r
+                isexact = false; break
+            end
+        end
+    else
+        isexact = false
+    end
+    if verbose
+        if isexact
+            println("SDP solution solves the trace sum max problem exactly")
+        else
+            println("SDP solution solves the trace sum max problem approximately")
+        end
+    end
+    E = Uchol.L[invperm(Uchol.piv), 1:r]
+    O = [Matrix{T}(undef, d[i], r) for i in 1:m]
+    # impove accuracy by SVD projection
+    for i in 1:m
+        ir = (sum(d[1:i-1]) + 1):sum(d[1:i])
+        Eisvd = svd!(E[ir, :]; full = false)
+        mul!(O[i], Eisvd.U, Eisvd.Vt)
+    end
+    # fix identifiability and compute final trace sum objective
+    identify!(O)
+    O, dot(O, S * O), obj, isexact
+end
+
+"""
+	test_optimality(O::Vector{Matrix}, S::Matrix{Matrix}; tol)
+
+Test if the vector of orthogonal matrices `O` is globally optimal. The `O` is 
+assumed to satisfy the first-order optimality conditions. Each of `O[i]` is a 
+`di x r` matrix. Each of `S[i, j]` for `i < j` is a `di x dj` matrix. 
+Tolerance `tol` is used to test the positivity of the smallest eigenvalue
+of the test matrix.
+
+# Positional arguments
+- `O :: Vector{Matrix}`: a point satisifying the 1st order optimality.
+- `S :: Matrix{Matrix}`: data matrix.
+
+# Output
+- `z`  : 1=globally optimal; 0=undecided; -1=suboptimal.
+- `val`: smallest eigenvalue of the test matrix if `z=1` or `0`; `-Inf` otherwise.
+"""
+function test_optimality(
+    O             :: Vector{Matrix{T}},
+    S             :: Matrix{Matrix{T}},
+    tol           :: Number = 1e-3
+    ) where T <: BlasReal
+    r  = size(O[1], 2)
+	L  = copy(-S) # test matrix
+    m  = size(S, 1)
+    SO = S * O 	# SO[i] = sum_{j≠i} S_{ij} O_j
+	Λi = Matrix{T}(undef, r, r)
+    @inbounds for i in 1:m
+        mul!(Λi, transpose(O[i]), SO[i])
+        # check symmetry of Λi (first order optimality condition)
+        δi = check_symmetry(Λi) 
+        δi > abs(tol) && 
+            @warn "Λ$i not symmetric; norm(Λ - Λ') = $δi; " *
+            "first order optimality not satisfied"
+		λmin = eigmin(Symmetric(Λi))
+        λmin < -abs(tol) && (return -1, -Inf)
+        for j in 1:r
+            Λi[j, j] -= λmin
+        end
+        L[i, i] .+= O[i] * Symmetric(Λi) * transpose(O[i])
+        for k in 1:size(O[i], 1)
+            L[i, i][k, k] += λmin
+        end
+	end
+	λmin = eigmin(Symmetric(cat(L)))
+	z = λmin > -abs(tol) ? 1 : 0
+	return z, λmin
+end
+
+"""
+    check_symmetry(A)
+
+Return `norm(A - A')`. If the return value is close to 0, `A` is nearly symmetric. 
+"""
+function check_symmetry(A::AbstractMatrix)
+    @assert size(A, 1) == size(A, 2) "A is not square"
+    δ = zero(eltype(A))
+    @inbounds for j in 2:size(A, 2), i in 1:j-1
+        δ += abs2(A[i, j] - A[j, i])
+    end
+    sqrt(δ)
 end
 
 # """
@@ -340,236 +488,3 @@ end
 #     identify!(O)
 #     O, obj, dot(O, S * O), isexact
 # end
-
-"""
-    otsm_sdp(S, r)
-
-Maximize the trace sum `2sum_{i<j} trace(Oi' * S[i, j] * Oj)` subject to the
-orthogonality constraint `Oi' * Oi == I(r)` using an SDP relaxation (P-SDP in 
-the manuscript). Each of `S[i, j]` for `i < j` is a `di x dj` matrix and 
-`S[i, j] = S[j, i]'`.
-
-# Output
-- `O`       : solution.
-- `tracesum`: trace sum at solution.
-- `obj`     : SDP relaxation objective value at solution.
-- `isexaxt` : `true` means global optimality.
-"""
-function otsm_sdp(
-    S       :: Matrix{Matrix{T}},
-    r       :: Integer;
-    verbose :: Bool = false,
-    O       :: Union{Nothing, Vector{Matrix{T}}} = nothing,
-    solver  = SCS.Optimizer()
-    ) where T <: BlasReal
-    m = size(S, 1)
-    d = [size(S[i, i], 1) for i in 1:m] # (d[i], d[j]) = size(S[i, j])
-    # check (1) Sji = Sij, (2) Sii = 0
-    verify_input_data!(S, r)
-    S̃ = cat(S) # flattened matrix
-    # form and solve the SDP
-    U       = Convex.Semidefinite(sum(d), sum(d))
-    problem = Convex.maximize(m * tr(S̃ * U))
-    for i in 1:m
-        ir = (sum(d[1:i-1]) + 1):sum(d[1:i])
-        #problem.constraints += U[ir, ir] ⪯ I(d[i]) / m
-        problem.constraints += eigmax(U[ir, ir]) <= inv(m)
-        problem.constraints += tr(U[ir, ir]) == r / m
-    end
-    if O === nothing
-        Convex.solve!(problem, () -> solver, verbose = verbose)
-    else
-        E   = cat(O)
-        E .*= √m 
-        mul!(U.value, E, transpose(E))
-        Convex.solve!(problem, () -> solver, verbose = verbose, warmstart = true)
-    end
-    obj = problem.optval
-    # retrieve solution to trace maximization problem
-    # quick return if NAN in SDP solution
-    if any(isnan.(U.value))
-        O = [fill(T(NaN), d[i], r) for i in 1:m]
-        return O, obj, T(NaN), false
-    end
-    Uchol = cholesky!(Symmetric(U.value), Val(true); # Cholesky with pivoting
-        check = false, tol = 1e-3maximum(diag(U.value)))
-    if rank(Uchol) ≤ r
-        isexact = true
-        for i in 1:m
-            ir      = (sum(d[1:i-1]) + 1):sum(d[1:i])
-            Uii     = Symmetric(U.value[ir, ir])
-            Uiichol = cholesky(Uii, Val(true); 
-                check = false, tol = 1e-3maximum(diag(Uii)))
-            if rank(Uiichol) > r
-                isexact = false; break
-            end
-        end
-    else
-        isexact = false
-    end
-    if verbose
-        if isexact
-            println("SDP solution solves the trace sum max problem exactly")
-        else
-            println("SDP solution solves the trace sum max problem approximately")
-        end
-    end
-    E = Uchol.L[invperm(Uchol.piv), 1:r]
-    O = [Matrix{T}(undef, d[i], r) for i in 1:m]
-    # impove accuracy by SVD projection
-    for i in 1:m
-        ir = (sum(d[1:i-1]) + 1):sum(d[1:i])
-        Eisvd = svd!(E[ir, :]; full = false)
-        mul!(O[i], Eisvd.U, Eisvd.Vt)
-    end
-    # fix identifiability and compute final trace sum objective
-    identify!(O)
-    O, dot(O, S * O), obj, isexact
-end
-
-"""
-	test_optimality(O::Vector{Matrix}, S::Matrix{Matrix}; tol)
-
-Test if the vector of orthogonal matrices `O` is globally optimal. The `O` is 
-assumed to satisfy the first-order optimality conditions. Each of `O[i]` is a 
-`di x r` matrix. Each of `S[i, j]` for `i < j` is a `di x dj` matrix. 
-Tolerance `tol` is used to test the positivity of the smallest eigenvalue
-of the test matrix.
-
-# Positional arguments
-- `O :: Vector{Matrix}`: a point satisifying the 1st order optimality.
-- `S :: Matrix{Matrix}`: data matrix.
-
-# Output
-- `z`  : 1=globally optimal; 0=undecided; -1=suboptimal.
-- `val`: smallest eigenvalue of the test matrix if `z=1` or `0`; `-Inf` otherwise.
-"""
-function test_optimality(
-    O   :: Vector{Matrix{T}},
-    S   :: Matrix{Matrix{T}},
-	tol :: Number = 1e-3
-    ) where T <: BlasReal
-    r  = size(O[1], 2)
-    verify_input_data!(S, r) # check (1) Sji = Sij', (2) Sii = 0
-	L  = copy(-S) # test matrix
-    m  = size(S, 1)
-    SO = S * O 	# SO[i] = sum_{j≠i} S_{ij} O_j
-	Λi = Matrix{T}(undef, r, r)
-    @inbounds for i in 1:m
-        mul!(Λi, transpose(O[i]), SO[i])
-        # check symmetry of Λi (first order optimality condition)
-        δi = check_symmetry(Λi) 
-        δi > abs(tol) && 
-            @warn "Λ$i not symmetric; norm(Λ - Λ') = $δi; " *
-            "first order optimality not satisfied"
-		λmin = eigmin(Symmetric(Λi))
-        λmin < -abs(tol) && (return -1, -Inf)
-        for j in 1:r
-            Λi[j, j] -= λmin
-        end
-        L[i, i] .+= O[i] * Symmetric(Λi) * transpose(O[i])
-        for k in 1:size(O[i], 1)
-            L[i, i][k, k] += λmin
-        end
-	end
-	λmin = eigmin(Symmetric(cat(L)))
-	z = λmin > -abs(tol) ? 1 : 0
-	return z, λmin
-end
-
-"""
-	init_eye(S)
-
-Initialize `O[i]` by an `di x r` diagonal matrix with ones on diagonal.
-"""
-function init_eye(
-    S :: Matrix{Matrix{T}},
-    r :: Integer
-    ) where T <: BlasReal
-    [Matrix{T}(I, size(S[i, i], 1), r) for i in 1:size(S, 1)]
-end
-
-"""
-	init_tb(S)
-
-Compute initial point following Ten Berge's second upper bound (p. 273).
-Take the eigenvectors corresponding to the r largest eigenvalues of S.
-This is a `D x r` orthogonal matrix, ``D=\\sum_{i=1}^m d_i``.
-For each `di x r` block, project to the Stiefel manifold.
-These blocks constitute an initial point.
-"""
-function init_tb(
-    S :: Matrix{Matrix{T}},
-    r :: Integer
-    ) where T <: BlasReal
-    m = size(S, 1)
-    # only need evecs corresponding to largest r evals
-	V = (eigen!(Symmetric(cat(S))).vectors)[:, end:-1:end-r+1]
-	rowoffset = 0
-	O = [Matrix{T}(undef, size(S[i, i], 1), r) for i in 1:m]
-	for i in 1:m
-		di         = size(S[i, i], 1)
-		rowidx     = rowoffset+1:rowoffset+di
-		Visvd      = svd!(V[rowidx, :])
-		mul!(O[i], Visvd.U, Visvd.Vt)
-		rowoffset += di
-	end
-	return O
-end
-
-"""
-	init_sb(S, r)
-
-Compute initial point following Shapiro-Botha (p. 380). Fill in the diagonal 
-block of `S` with ``-\\sum_{j \\neq i} P_{ij} * D_{ij} * P_{ij}``, where 
-``P_{ij} * D_{ij} * Q_{ij}`` is the SVD of ``S_{ij}``. The resulting matrix is 
-negative semidefinite. Take the eigenvectors corresponding to the `r` largest 
-eigenvalues. This is a `D x r` orthogonal matrix, ``D=\\sum_{i=1}^m d_i``.
-For each `di x r` block, project to the Stiefel manifold.
-These blocks constitute an initial point.
-"""
-function init_sb(
-    S :: Matrix{Matrix{T}},
-    r :: Integer
-    ) where T <: BlasReal
-	m    = size(S, 1)
-    SS   = copy(S) # note SS[i,j] and S[i,j] point to same data
-    Ssvd = [svd(S[i, j]) for i in 1:m, j in 1:m]
-    for i in 1:m
-        # now SS[i,i] points to diff data than S[i,i], so we are not worrried
-        # changing data in S[i, i]
-        SS[i, i] = zeros(T, size(SS[i, i])) 
-		for j in 1:m
-            if j ≠ i 
-                svdij = Ssvd[i, j]
-				SS[i, i] .-= svdij.U * Diagonal(svdij.S) * transpose(svdij.U)
-			end
-		end
-	end
-	# only need evecs corresponding to largest r evals
-	V = (eigen!(Symmetric(cat(SS))).vectors)[:, end:-1:end-r+1]
-	rowoffset = 0
-	O = [Matrix{T}(undef, size(S[i, i], 1), r) for i in 1:m]
-	for i in 1:m
-		di = size(SS[i,i], 1)
-		rowidx     = rowoffset+1:rowoffset+di
-		Visvd      = svd!(V[rowidx, :])
-		mul!(O[i], Visvd.U, Visvd.Vt)
-		rowoffset += di
-	end
-	return O
-end
-
-"""
-    check_symmetry(A)
-
-Return `norm(A - A')`. If the return value is close to 0, `A` is nearly symmetric. 
-"""
-function check_symmetry(A::AbstractMatrix)
-    @assert size(A, 1) == size(A, 2) "A is not square"
-    δ = zero(eltype(A))
-    @inbounds for j in 2:size(A, 2), i in 1:j-1
-        δ += abs2(A[i, j] - A[j, i])
-    end
-    sqrt(δ)
-end

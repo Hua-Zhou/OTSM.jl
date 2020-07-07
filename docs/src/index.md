@@ -4,7 +4,7 @@ OTSM.jl implements algorithms for solving the orthogonal trace sum maximization 
   
 $\operatorname{maximize} \sum_{i,j=1}^m \operatorname{tr} (O_i^T S_{ij} O_j)$
 
-subject to orthogonality constraint $O_i^T O_i = I_r$. Here $S_{i,j} \in \mathbb{R}^{d_i \times d_j}$, $1 \le i, j \le m$, are data matrices. Many problems such as canonical correlation analysis (CCA) with $m \ge 2$ data sets, Procrustes analysis with $m \ge 2$ images, and orthogonal least squares are special cases of OSTM. 
+subject to orthogonality constraint $O_i^T O_i = I_r$. Here $S_{ij} \in \mathbb{R}^{d_i \times d_j}$, $1 \le i, j \le m$, are data matrices. $S_{ii}$ are symmetric and $S_{ij} = S_{ji}^T$. Many problems such as canonical correlation analysis (CCA) with $m \ge 2$ data sets, Procrustes analysis with $m \ge 2$ images, orthogonal least squares, and MaxBet are special cases of OSTM. 
 
 Details on OTSM are described in paper: 
 
@@ -28,8 +28,8 @@ Use the backspace key to return to the Julia REPL.
 versioninfo()
 ```
 
-    Julia Version 1.4.1
-    Commit 381693d3df* (2020-04-14 17:20 UTC)
+    Julia Version 1.4.2
+    Commit 44fa15b150* (2020-05-23 18:35 UTC)
     Platform Info:
       OS: macOS (x86_64-apple-darwin18.7.0)
       CPU: Intel(R) Core(TM) i7-6920HQ CPU @ 2.90GHz
@@ -47,13 +47,61 @@ versioninfo()
 using OTSM
 ```
 
-## Example data
+## Algorithms
 
-The package contains the port wine example data set from the [Hanafi and Kiers (200)](https://doi.org/10.1016/j.csda.2006.04.020) paper. It can be retrieved by the `portwine_data()` function.
+### Proximal block ascent algorithm
+
+The `otsm_pba()` function implements an efficient local search algorithm for solving OTSM.
+
+For documentation of the `otsm_pba()` function, type ?otsm_bpa in Julia REPL.
+```@docs
+otsm_pba
+```
+
+### Semidefinite programming (SDP) relaxation 
+
+The `otsm_sdp()` function implements an SDP relaxation approach for solving OTSM.
+
+For documentation of the `otsm_pba()` function, type ?otsm_bpa in Julia REPL.
+```@docs
+otsm_sdp
+```
+
+## Start point
+
+Different strategies for starting point are implemented. 
+
+1. Initialize $O_i$ by $I_r$. This the default for the proximal block ascent algorithm `otsm_pba`.
+
+```@docs
+init_eye
+```
+
+2. Initialize $O_i$ by a strategy by Ten Berge.
+
+```@docs
+init_tb
+```
+
+3. Initialize $O_i$ by a strategy by Liu-Wang-Wang.
+
+```@docs
+init_lww1
+```
+
+4. Initialize $O_i$ by a strategy by Shapiro-Botha (p. 380).
+
+```@docs
+init_sb
+```
+
+## Example data - Port Wine
+
+The package contains the port wine example data set from the [Hanafi and Kiers (2006)](https://doi.org/10.1016/j.csda.2006.04.020) paper. It can be retrieved by the `portwine_data()` function.
 
 
 ```julia
-A, S, = portwine_data();
+A, _, _ = portwine_data();
 ```
 
 Data matrices A1, A2, A3, A4 record the ratings (centered at 0) of $m=4$ accessors on 8 port wines in $d_1=4$, $d_2=3$, $d_3=4$, and $d_4=3$ aspects respectively. 
@@ -113,17 +161,21 @@ end
       0.0   2.125   1.375
 
 
+## MAXDIFF
+
 The MAXDIFF approach for CCA seeks the rotations of $A_i$ that achieve the maximal agreement
 
-$\operatorname{maximize} \sum_{i < j} \operatorname{tr} (O_i^T A_i^T A_j O_j),$
+$\operatorname{maximize} 2 \sum_{i < j} \operatorname{tr} (O_i^T A_i^T A_j O_j),$
 
 subject to constraint $O_i^T O_i = I_r$. This corresponds to an OTSM problem with $S_{ij} = A_i^T A_j$ and $S_{ii} = 0$.
 
 
 ```julia
-for i in 1:4, j in 1:i
-    display(S[i, j])
+Smaxdiff = [A[i]'A[j] for i in 1:4, j in 1:4]
+for i in 1:4
+    fill!(Smaxdiff[i, i], 0)
 end
+display.(Smaxdiff);
 ```
 
 
@@ -142,18 +194,33 @@ end
 
 
 
-    3×3 Array{Float64,2}:
-     0.0  0.0  0.0
-     0.0  0.0  0.0
-     0.0  0.0  0.0
-
-
-
     4×4 Array{Float64,2}:
       9.75  -26.0  -14.625   21.125
       8.0   -27.0  -10.0     18.0
      -6.0    21.0    2.5    -13.5
       4.5    -8.0  -12.75     6.75
+
+
+
+    3×4 Array{Float64,2}:
+     6.0   -11.0  -12.0     8.0
+     1.75    9.0   -6.625   1.125
+     0.25    3.0    6.125  -2.625
+
+
+
+    4×3 Array{Float64,2}:
+       5.0   -9.25     5.75
+     -15.0   36.0    -11.0
+     -12.0    5.875  -14.125
+      13.0  -20.375    7.625
+
+
+
+    3×3 Array{Float64,2}:
+     0.0  0.0  0.0
+     0.0  0.0  0.0
+     0.0  0.0  0.0
 
 
 
@@ -165,25 +232,33 @@ end
 
 
 
+    3×3 Array{Float64,2}:
+      9.0  -8.0    12.0
+      1.0   4.375   0.375
+     -6.0  -0.875  -8.875
+
+
+
+    4×4 Array{Float64,2}:
+       9.75     8.0   -6.0    4.5
+     -26.0    -27.0   21.0   -8.0
+     -14.625  -10.0    2.5  -12.75
+      21.125   18.0  -13.5    6.75
+
+
+
+    3×4 Array{Float64,2}:
+      13.0     11.0  -5.0  10.0
+     -21.625  -21.0  16.5  -5.75
+      14.375   11.0  -2.5  13.25
+
+
+
     4×4 Array{Float64,2}:
      0.0  0.0  0.0  0.0
      0.0  0.0  0.0  0.0
      0.0  0.0  0.0  0.0
      0.0  0.0  0.0  0.0
-
-
-
-    3×4 Array{Float64,2}:
-     6.0   -11.0  -12.0     8.0
-     1.75    9.0   -6.625   1.125
-     0.25    3.0    6.125  -2.625
-
-
-
-    3×3 Array{Float64,2}:
-      9.0  -8.0    12.0
-      1.0   4.375   0.375
-     -6.0  -0.875  -8.875
 
 
 
@@ -194,47 +269,61 @@ end
 
 
 
+    4×3 Array{Float64,2}:
+       6.0   1.75    0.25
+     -11.0   9.0     3.0
+     -12.0  -6.625   6.125
+       8.0   1.125  -2.625
+
+
+
+    3×3 Array{Float64,2}:
+      9.0  1.0    -6.0
+     -8.0  4.375  -0.875
+     12.0  0.375  -8.875
+
+
+
+    4×3 Array{Float64,2}:
+     13.0   2.875  -2.375
+     10.0  -2.0    -4.0
+     -4.0  -0.5    -4.5
+     10.0   1.25   -7.25
+
+
+
     3×3 Array{Float64,2}:
      0.0  0.0  0.0
      0.0  0.0  0.0
      0.0  0.0  0.0
 
 
-## Proximal block ascent algorithm
-
-The `otsm_pba()` function implements an efficient local search algorithm for solving OTSM.
+Proximal block ascent algorithm for finding a rank $r=2$ solution to MAXDIFF.
 
 
 ```julia
-Ô_pba, ts_pba, obj, history = otsm_pba(S, 2; verbose = true);
+Ô_pba, ts_pba, obj, history = otsm_pba(Smaxdiff, 2; verbose = true);
 ```
 
-    iter = 1, obj = 539.8501989834106
-    iter = 2, obj = 542.2346791607897
-    iter = 3, obj = 542.326755374587
-    iter = 4, obj = 542.3275270111226
-    iter = 5, obj = 542.327550329459
-    iter = 6, obj = 542.3275506362339
-    iter = 7, obj = 542.3275506383457
+    iter = 1, obj = 110.25
+    iter = 2, obj = 533.6042318034453
+    iter = 3, obj = 542.2027792984238
+    iter = 4, obj = 542.3265730402211
+    iter = 5, obj = 542.3275463498419
+    iter = 6, obj = 542.3275506295132
+    iter = 7, obj = 542.327550638136
 
-
-For documentation of the `otsm_pba()` function, type ?otsm_bpa in Julia REPL.
-```@docs
-otsm_pba
-```
-
-## Check global optimality of a local solution
 
 The `test_optimality()` function attempts to certify whether a local solution `O::Vector{Matrix}` is a global solution. By a local solution, we mean a point that satifies the first order optimality condition:
 
-$\Lambda_i = \sum_{j \ne i} O_i^T S_{ij} O_j$
+$\Lambda_i = \sum_{j} O_i^T S_{ij} O_j$
 
 is symmetric for $i=1,\ldots,m$. The first output indicates the solution is global optimal (1), or uncertain (0), or suboptimal (-1).
 
 
 ```julia
 # proximal block ascent yields the global solution
-test_optimality(Ô_pba, S)[1]
+test_optimality(Ô_pba, Smaxdiff)[1]
 ```
 
 
@@ -248,3 +337,180 @@ For documentation of the `test_optimality()` function, type `?test_optimality` i
 ```@docs
 test_optimality
 ```
+
+## MAXBET
+
+The MAXBET approach for CCA seeks the rotations of $A_i$ that achieve the maximal agreement
+
+$\operatorname{maximize} \sum_{i,j} \operatorname{tr} (O_i^T A_i^T A_j O_j),$
+
+subject to constraint $O_i^T O_i = I_r$. This corresponds to an OTSM problem with $S_{ij} = A_i^T A_j$.
+
+
+```julia
+Smaxbet = [A[i]'A[j] for i in 1:4, j in 1:4]
+display.(Smaxbet);
+```
+
+
+    4×4 Array{Float64,2}:
+       5.5   -12.0  -6.25     7.25
+     -12.0    54.0   6.0    -31.0
+      -6.25    6.0  17.875   -9.375
+       7.25  -31.0  -9.375   28.875
+
+
+
+    3×4 Array{Float64,2}:
+      5.0   -15.0  -12.0     13.0
+     -9.25   36.0    5.875  -20.375
+      5.75  -11.0  -14.125    7.625
+
+
+
+    4×4 Array{Float64,2}:
+      9.75  -26.0  -14.625   21.125
+      8.0   -27.0  -10.0     18.0
+     -6.0    21.0    2.5    -13.5
+      4.5    -8.0  -12.75     6.75
+
+
+
+    3×4 Array{Float64,2}:
+     6.0   -11.0  -12.0     8.0
+     1.75    9.0   -6.625   1.125
+     0.25    3.0    6.125  -2.625
+
+
+
+    4×3 Array{Float64,2}:
+       5.0   -9.25     5.75
+     -15.0   36.0    -11.0
+     -12.0    5.875  -14.125
+      13.0  -20.375    7.625
+
+
+
+    3×3 Array{Float64,2}:
+      12.0  -10.0    11.0
+     -10.0   29.875  -7.125
+      11.0   -7.125  15.875
+
+
+
+    4×3 Array{Float64,2}:
+     13.0  -21.625  14.375
+     11.0  -21.0    11.0
+     -5.0   16.5    -2.5
+     10.0   -5.75   13.25
+
+
+
+    3×3 Array{Float64,2}:
+      9.0  -8.0    12.0
+      1.0   4.375   0.375
+     -6.0  -0.875  -8.875
+
+
+
+    4×4 Array{Float64,2}:
+       9.75     8.0   -6.0    4.5
+     -26.0    -27.0   21.0   -8.0
+     -14.625  -10.0    2.5  -12.75
+      21.125   18.0  -13.5    6.75
+
+
+
+    3×4 Array{Float64,2}:
+      13.0     11.0  -5.0  10.0
+     -21.625  -21.0  16.5  -5.75
+      14.375   11.0  -2.5  13.25
+
+
+
+    4×4 Array{Float64,2}:
+      26.875   20.0  -13.5  12.25
+      20.0     18.0  -11.0   9.0
+     -13.5    -11.0   12.0  -2.0
+      12.25     9.0   -2.0  11.5
+
+
+
+    3×4 Array{Float64,2}:
+     13.0    10.0  -4.0  10.0
+      2.875  -2.0  -0.5   1.25
+     -2.375  -4.0  -4.5  -7.25
+
+
+
+    4×3 Array{Float64,2}:
+       6.0   1.75    0.25
+     -11.0   9.0     3.0
+     -12.0  -6.625   6.125
+       8.0   1.125  -2.625
+
+
+
+    3×3 Array{Float64,2}:
+      9.0  1.0    -6.0
+     -8.0  4.375  -0.875
+     12.0  0.375  -8.875
+
+
+
+    4×3 Array{Float64,2}:
+     13.0   2.875  -2.375
+     10.0  -2.0    -4.0
+     -4.0  -0.5    -4.5
+     10.0   1.25   -7.25
+
+
+
+    3×3 Array{Float64,2}:
+     10.0   2.0    -5.0
+      2.0  10.875   4.625
+     -5.0   4.625  11.875
+
+
+Proximal block ascent algorithm for finding a rank $r=2$ solution to MAXBET.
+
+
+```julia
+Ô_pba, ts_pba, obj, history = otsm_pba(Smaxbet, 2; verbose = true);
+```
+
+    iter = 1, obj = 277.375
+    iter = 2, obj = 764.1356726873341
+    iter = 3, obj = 778.7331067492262
+    iter = 4, obj = 779.6549606655808
+    iter = 5, obj = 779.7384589334283
+    iter = 6, obj = 779.7524622915565
+    iter = 7, obj = 779.7559335371038
+    iter = 8, obj = 779.7568884016266
+    iter = 9, obj = 779.7571562628467
+    iter = 10, obj = 779.7572317387999
+    iter = 11, obj = 779.7572530443673
+    iter = 12, obj = 779.7572590648325
+    iter = 13, obj = 779.7572607671433
+    iter = 14, obj = 779.7572612486537
+    iter = 15, obj = 779.7572613848802
+    iter = 16, obj = 779.7572614234249
+    iter = 17, obj = 779.7572614343316
+    iter = 18, obj = 779.7572614374178
+    iter = 19, obj = 779.7572614382912
+
+
+This local solution is certified to be global optimal.
+
+
+```julia
+# proximal block ascent yields the global solution
+test_optimality(Ô_pba, Smaxbet)[1]
+```
+
+
+
+
+    1
+
+

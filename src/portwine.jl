@@ -26,10 +26,7 @@ function portwine_data()
     m = 4
     A = [A1', A2', A3', A4']
     A = map(M -> M .- mean(M, dims=1), A)
-    S = [A[i]'A[j] for i in 1:m, j in 1:m]
-    for i in 1:m
-        fill!(S[i, i], 0)
-    end
-    ts_optim = [419.65133740484237, 542.3275506383522, 568.19290485317]
-    A, S, ts_optim
+    maxdiff_optim = [419.65133740484237, 542.3275506383522, 568.19290485317]
+    maxbet_optim  = [605.6934523038526, 779.7572614382912, 829.7087289316665]
+    A, maxdiff_optim, maxbet_optim
 end
