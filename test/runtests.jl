@@ -15,9 +15,7 @@ end
 @testset "otsm_pba (port wine, MAXDIFF)" begin
 A, maxdiff_optim, _ = portwine_data()
 Smaxdiff = [A[i]'A[j] for i in 1:4, j in 1:4]
-for i in 1:4
-    fill!(Smaxdiff[i, i], 0)
-end
+OTSM.verify_input_data!(Smaxdiff, 3, true) # set S[i, i] to 0
 for r in 1:3
     for init_fun in [init_eye, init_sb, init_tb]        
         @info "rank = $r, init = $init_fun"
@@ -55,12 +53,10 @@ end
 # display(bm); println()
 end
 
-@testset "SDP relaxation (port wine example)" begin
+@testset "SDP relaxation (port wine, MAXDIFF)" begin
 A, maxdiff_optim, _ = portwine_data()
 Smaxdiff = [A[i]'A[j] for i in 1:4, j in 1:4]
-for i in 1:4
-    fill!(Smaxdiff[i, i], 0)
-end
+OTSM.verify_input_data!(Smaxdiff, 3, true) # set S[i, i] to 0
 for r in 1:3
     for solver in [
         #Mosek.Optimizer(LOG=0),
