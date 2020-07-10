@@ -115,9 +115,9 @@ function otsm_pba(
     S        :: Matrix{Matrix{T}},
     r        :: Integer;
 	αinv     :: Number  = 1e-3,
-    maxiter  :: Integer = 1000,
-    tolfun   :: Number  = 1e-8,
-    tolvar   :: Number  = 1e-6,
+    maxiter  :: Integer = 50000,
+    tolfun   :: Number  = 1e-10,
+    tolvar   :: Number  = 1e-8,
     verbose  :: Bool    = false,
     log      :: Bool    = false,
     O        :: Vector{Matrix{T}} = init_eye(S, r)
@@ -151,7 +151,7 @@ function otsm_pba(
             copyto!(ΔO[i], O[i])
             mul!(O[i], Fi.U, Fi.Vt)
             ΔO[i] .= O[i] .- ΔO[i]
-            # update SO[j], j ≠ i
+            # update SO[j]
             for j in 1:m
                 BLAS.gemm!('N', 'N', T(1), S[j, i], ΔO[i], T(1), SO[j])
             end
@@ -276,14 +276,14 @@ of the test matrix.
 - `val`: smallest eigenvalue of the test matrix if `z=1` or `0`; `-Inf` otherwise.
 """
 function test_optimality(
-    O             :: Vector{Matrix{T}},
-    S             :: Matrix{Matrix{T}},
-    tol           :: Number = 1e-3
+    O   :: Vector{Matrix{T}},
+    S   :: Matrix{Matrix{T}},
+    tol :: Number = 1e-3
     ) where T <: BlasReal
     r  = size(O[1], 2)
 	L  = copy(-S) # test matrix
     m  = size(S, 1)
-    SO = S * O 	# SO[i] = sum_{j≠i} S_{ij} O_j
+    SO = S * O 	# SO[i] = sum_{j} S_{ij} O_j
 	Λi = Matrix{T}(undef, r, r)
     @inbounds for i in 1:m
         mul!(Λi, transpose(O[i]), SO[i])
