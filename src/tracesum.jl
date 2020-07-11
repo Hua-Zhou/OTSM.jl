@@ -272,8 +272,16 @@ of the test matrix.
 - `S :: Matrix{Matrix}`: data matrix.
 
 # Output
-- `z`  : 1=globally optimal; 0=undecided; -1=suboptimal.
-- `val`: smallest eigenvalue of the test matrix if `z=1` or `0`; `-Inf` otherwise.
+A tuple `(z1, ev1), (z2, ev2)`, where `(z1, ev1)` is the certificate result 
+by Won-Zhou-Lange (2018) and `(z2, ev2)` is the certificate result by 
+Liu-Wang-Wang (2015). `z1` and `z2` can take value 
+- `:infeasible`: orthogonality constraints violated
+- `:suboptimal`: failed the first-order optimality (stationarity) condition  
+- `:stationary_point`: satisfied first-order optimality; could or could not be a
+global optimal point
+- `:globaloptimal`: certified global optimality
+`ev1` is the minimum eigenvalue of the Won-Zhou-Lange certificate matrix. `ev2` 
+is the minimum eigenvalue of the Liu-Wang-Wang certificate matrix.
 """
 function test_optimality(
     O   :: Vector{Matrix{T}},

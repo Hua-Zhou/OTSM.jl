@@ -12,12 +12,7 @@ Details on OTSM are described in paper:
 
 ## Installation
 
-This package requires Julia v1.0 or later, which can be obtained from
-<https://julialang.org/downloads/> or by building Julia from the sources in the
-<https://github.com/JuliaLang/julia> repository.
-
-The package has not yet been registered and must be installed using the repository location.
-Start julia and use the `]` key to switch to the package manager REPL
+OTSM.jl requires Julia v1.0 or later. The package has not yet been registered and must be installed using the repository location. Start julia and use the `]` key to switch to the package manager REPL
 ```julia
 (@v1.4) pkg> add https://github.com/Hua-Zhou/OTSM.jl
 ```
@@ -53,7 +48,7 @@ using OTSM
 
 The `otsm_pba()` function implements an efficient local search algorithm for solving OTSM.
 
-For documentation of the `otsm_pba()` function, type ?otsm_bpa in Julia REPL.
+For documentation of the `otsm_pba()` function, type `?otsm_bpa` in Julia REPL.
 ```@docs
 otsm_pba
 ```
@@ -62,7 +57,7 @@ otsm_pba
 
 The `otsm_sdp()` function implements an SDP relaxation approach for solving OTSM.
 
-For documentation of the `otsm_pba()` function, type ?otsm_bpa in Julia REPL.
+For documentation of the `otsm_sdp()` function, type `?otsm_sdp` in Julia REPL.
 ```@docs
 otsm_sdp
 ```
@@ -71,7 +66,7 @@ otsm_sdp
 
 Different strategies for starting point are implemented. 
 
-1. Initialize $O_i$ by $I_r$. This the default for the proximal block ascent algorithm `otsm_pba`.
+1. Initialize $O_i$ by $I_r$. This is the default for the proximal block ascent algorithm `otsm_pba`.
 
 ```@docs
 init_eye
@@ -312,13 +307,11 @@ Proximal block ascent algorithm for finding a rank $r=2$ solution to MAXDIFF.
     iter = 5, obj = 542.3275463498419
     iter = 6, obj = 542.3275506295132
     iter = 7, obj = 542.327550638136
+    iter = 8, obj = 542.3275506383478
+    iter = 9, obj = 542.3275506383521
 
 
-The `test_optimality()` function attempts to certify whether a local solution `O::Vector{Matrix}` is a global solution. By a local solution, we mean a point that satifies the first order optimality condition:
-
-$\Lambda_i = \sum_{j} O_i^T S_{ij} O_j$
-
-is symmetric for $i=1,\ldots,m$. The first output indicates the solution is global optimal (1), or uncertain (0), or suboptimal (-1).
+The `test_optimality()` function attempts to certify whether a local solution `O::Vector{Matrix}` is a global solution. The first output indicates the solution is `:infeasible`, `:suboptimal`, `:stationary_point`, or `:global_optimal`.
 
 
 ```julia
@@ -329,7 +322,7 @@ test_optimality(Ô_pba, Smaxdiff)[1]
 
 
 
-    1
+    (:global_optimal, 5.479244488258054e-16)
 
 
 
@@ -498,6 +491,14 @@ Proximal block ascent algorithm for finding a rank $r=2$ solution to MAXBET.
     iter = 17, obj = 779.7572614343316
     iter = 18, obj = 779.7572614374178
     iter = 19, obj = 779.7572614382912
+    iter = 20, obj = 779.7572614385383
+    iter = 21, obj = 779.7572614386082
+    iter = 22, obj = 779.7572614386279
+    iter = 23, obj = 779.7572614386337
+    iter = 24, obj = 779.757261438635
+    iter = 25, obj = 779.757261438636
+    iter = 26, obj = 779.7572614386361
+    iter = 27, obj = 779.7572614386356
 
 
 This local solution is certified to be global optimal.
@@ -511,6 +512,6 @@ test_optimality(Ô_pba, Smaxbet)[1]
 
 
 
-    1
+    (:global_optimal, 1.7821236672382104e-14)
 
 
