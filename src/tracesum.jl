@@ -287,12 +287,12 @@ function test_optimality(
     # certificate matrix for Won-Zhou-Lange approach (Theorem 3.1)
     C1  = copy(-S) 
     # certificate matrix for Liu-Wang-Wang approach (Theorem 2.4, p1493)
-    C2 = [-kron(S[i, j], I(r)) for i in 1:m, j in 1:m]
+    C2 = [-kron(S[i, j], Matrix(I, r, r)) for i in 1:m, j in 1:m]
     @inbounds for i in 1:m
         ni = size(O[i], 1)
         # check constraint satisfication O[i]'O[i] = I(r)
         mul!(Λi, transpose(O[i]), O[i])
-        (Λi ≈ I(r)) || 
+        Λi ≈ I || 
             (return (:infeasible, T(NaN)), (:infeasible, T(NaN)))
         # Λi = O[i] * \sum_j S[i, j] * O[j]
         mul!(Λi, transpose(O[i]), SO[i])
@@ -300,11 +300,11 @@ function test_optimality(
         δi = check_symmetry(Λi)
         if δi > abs(tol)
             @warn "Λ$i not symmetric; norm(Λ - Λ') = $δi; " *
-            "first order optimality not satisfied"
+                "first order optimality not satisfied"
             return (:suboptimal, T(NaN)), (:suboptimal, T(NaN))
         end
         # update certificate matrix by Liu-Wang-Wang
-        C2[i, i] += kron(I(ni), Λi)
+        C2[i, i] += kron(Matrix(I, ni, ni), Λi)
         # update certificate matrix by Won-Zhou-Lange
 		λmin = eigmin(Symmetric(Λi))
         # λmin < -abs(tol) && (return -1, -Inf)
