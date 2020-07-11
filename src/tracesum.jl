@@ -131,7 +131,7 @@ function otsm_pba(
     IterativeSolvers.reserve!(T, history, :tracesum, maxiter)
     IterativeSolvers.reserve!(T, history, :vchange , maxiter)
     # initial objective value
-    SO      = S * O # SO[i] = sum_{j≠i} S_{ij} O_j
+    SO      = S * O # SO[i] = sum_{j} S_{ij} O_j
     obj::T  = dot(O, SO)
     IterativeSolvers.nextiter!(history)
     push!(history, :tracesum, obj)
@@ -268,7 +268,7 @@ Tolerance `tol` is used to test the positivity of the smallest eigenvalue
 of the test matrix.
 
 # Positional arguments
-- `O :: Vector{Matrix}`: a point satisifying the 1st order optimality.
+- `O :: Vector{Matrix}`: a point satisifying `O[i]'O[i]=I(r)`.
 - `S :: Matrix{Matrix}`: data matrix.
 
 # Output
@@ -281,30 +281,48 @@ function test_optimality(
     tol :: Number = 1e-3
     ) where T <: BlasReal
     r  = size(O[1], 2)
-	L  = copy(-S) # test matrix
     m  = size(S, 1)
     SO = S * O 	# SO[i] = sum_{j} S_{ij} O_j
 	Λi = Matrix{T}(undef, r, r)
+    # certificate matrix for Won-Zhou-Lange approach (Theorem 3.1)
+    C1  = copy(-S) 
+    # certificate matrix for Liu-Wang-Wang approach (Theorem 2.4, p1493)
+    C2 = [-kron(S[i, j], I(r)) for i in 1:m, j in 1:m]
     @inbounds for i in 1:m
+        ni = size(O[i], 1)
+        # check constraint satisfication O[i]'O[i] = I(r)
+        mul!(Λi, transpose(O[i]), O[i])
+        (Λi ≈ I(r)) || 
+            (return (:infeasible, T(NaN)), (:infeasible, T(NaN)))
+        # Λi = O[i] * \sum_j S[i, j] * O[j]
         mul!(Λi, transpose(O[i]), SO[i])
         # check symmetry of Λi (first order optimality condition)
-        δi = check_symmetry(Λi) 
-        δi > abs(tol) && 
+        δi = check_symmetry(Λi)
+        if δi > abs(tol)
             @warn "Λ$i not symmetric; norm(Λ - Λ') = $δi; " *
             "first order optimality not satisfied"
+            return (:suboptimal, T(NaN)), (:suboptimal, T(NaN))
+        end
+        # update certificate matrix by Liu-Wang-Wang
+        C2[i, i] += kron(I(ni), Λi)
+        # update certificate matrix by Won-Zhou-Lange
 		λmin = eigmin(Symmetric(Λi))
-        λmin < -abs(tol) && (return -1, -Inf)
+        # λmin < -abs(tol) && (return -1, -Inf)
         for j in 1:r
             Λi[j, j] -= λmin
         end
-        L[i, i] .+= O[i] * Symmetric(Λi) * transpose(O[i])
-        for k in 1:size(O[i], 1)
-            L[i, i][k, k] += λmin
+        C1[i, i] .+= O[i] * Symmetric(Λi) * transpose(O[i])
+        for k in 1:ni
+            C1[i, i][k, k] += λmin
         end
-	end
-	λmin = eigmin(Symmetric(cat(L)))
-	z = λmin > -abs(tol) ? 1 : 0
-	return z, λmin
+    end
+    # check global optimality by Won-Zhou-Lange certificate
+    λmin1 = eigmin(Symmetric(cat(C1)))    
+    z1    = λmin1 > -abs(tol) ? :global_optimal : :stationary_point
+    # check global optimality by Liu-Wang-Wang certificate
+    λmin2 = eigmin(Symmetric(cat(C2)))
+    z2    = λmin2 > -abs(tol) ? :global_optimal : :stationary_point
+    return (z1, λmin1), (z2, λmin2)
 end
 
 """

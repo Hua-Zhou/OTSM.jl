@@ -23,7 +23,9 @@ for r in 1:3
             verbose = true, O = init_fun(Smaxdiff, r))
         @show ts_ba
         @test ts_ba ≈ maxdiff_optim[r]
-        @test test_optimality(Ô_ba, Smaxdiff)[1] == 1
+        @show test_optimality(Ô_ba, Smaxdiff)
+        # @test z1 == :global_optimal
+        # @test z2 == :global_optimal
     end
 end
 # bm = @benchmark tsm_ba(S, 1)
@@ -42,11 +44,11 @@ for r in 1:3
         if r == 3 && init_fun == init_eye
             # r=3, init=init_eye leads to an inferior local maximum
             @test ts_ba ≈ 818.7063749651282
-            @test test_optimality(Ô_ba, Smaxbet)[1] == 0
         else
             @test ts_ba ≈ maxbet_optim[r]
-            @test test_optimality(Ô_ba, Smaxbet)[1] == 1
         end
+        # check global optimality certificate
+        @show test_optimality(Ô_ba, Smaxbet)
     end
 end
 # bm = @benchmark tsm_ba(S, 1)
@@ -67,7 +69,7 @@ for r in 1:3
         @time Ô_sdp, ts_sdp, = otsm_sdp(Smaxdiff, r, solver = solver)
         @show ts_sdp
         @test ts_sdp ≈ maxdiff_optim[r]
-        @test test_optimality(Ô_sdp, Smaxdiff)[1] == 1
+        @show test_optimality(Ô_sdp, Smaxdiff)
     end
 end
 end
@@ -81,7 +83,7 @@ for init_fun in [init_eye, init_sb, init_tb]
     @info "init = $init_fun"
     @time Ô_ba, ts_ba, = otsm_pba(S, d; verbose = true, O = init_fun(S, d))
     @show ts_ba
-    @test test_optimality(Ô_ba, S)[1] == 1
+    @show test_optimality(Ô_ba, S)
 end
 @info "SDP relaxation (failed to find global solution):"
 for solver in [
@@ -92,7 +94,7 @@ for solver in [
     @info "solver = $solver"
     @time Ô_sdp, ts_sdp, = otsm_sdp(S, d, solver = solver)
     @show ts_sdp
-    @test test_optimality(Ô_sdp, S)[1] == -1
+    @show test_optimality(Ô_sdp, S)
 end
 end
 
@@ -118,10 +120,10 @@ for init_fun in [init_eye, init_tb, init_lww1]
     @time Ô_ba, ts_ba, = otsm_pba(S, r; verbose = true, O = init_fun(S, r))
     if init_fun == init_eye
         # init_eye leads to a inferior local maximum
-        @test test_optimality(Ô_ba, S)[1] == 0
+        @show test_optimality(Ô_ba, S)
         @test abs(ts_ba - 14.10123) < 1e-3
     else
-        @test test_optimality(Ô_ba, S)[1] == 1
+        @show test_optimality(Ô_ba, S)
         @test abs(ts_ba - 14.73022) < 1e-3
     end
 end
@@ -150,7 +152,6 @@ for init_fun in [init_eye, init_tb, init_lww1]
     @time Ô_ba, ts_ba, = otsm_pba(S, r; verbose = true, O = init_fun(S, r))
     @test abs(ts_ba - 378.9624) < 1e-3
     @show test_optimality(Ô_ba, S)
-    # @test test_optimality(Ô_ba, S)[1] == 1
 end
 end
 
