@@ -277,9 +277,11 @@ by Won-Zhou-Lange (2018) and `(z2, ev2)` is the certificate result by
 Liu-Wang-Wang (2015). `z1` and `z2` can take value 
 - `:infeasible`: orthogonality constraints violated
 - `:suboptimal`: failed the first-order optimality (stationarity) condition  
-- `:stationary_point`: satisfied first-order optimality; could or could not be a
+- `:stationary_point`: satisfied first-order optimality; can or can not be a
 global optimal point
-- `:globaloptimal`: certified global optimality
+- `:nonglobal_stationary_point`: satisfied first-order optimality; cannot be a 
+global optimal point
+- `:global_optimal`: certified global optimality
 `ev1` is the minimum eigenvalue of the Won-Zhou-Lange certificate matrix. `ev2` 
 is the minimum eigenvalue of the Liu-Wang-Wang certificate matrix.
 """
@@ -313,9 +315,13 @@ function test_optimality(
         end
         # update certificate matrix by Liu-Wang-Wang
         C2[i, i] += kron(Matrix(I, ni, ni), Λi)
-        # update certificate matrix by Won-Zhou-Lange
+        # if eigmin(Λi) < 0, then it cannot be global optimal
 		λmin = eigmin(Symmetric(Λi))
-        # λmin < -abs(tol) && (return -1, -Inf)
+        if λmin < -abs(tol)
+            return (:nonglobal_stationary_point, T(NaN)), 
+                (:nonglobal_stationary_point, T(NaN))
+        end
+        # update certificate matrix by Won-Zhou-Lange
         for j in 1:r
             Λi[j, j] -= λmin
         end
