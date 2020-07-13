@@ -28,7 +28,7 @@ end
 `S` is an array of matrices. Enforce `S[j, i] = S[i, j]'`, `i < j`, (copy 
 upper triangular blocks `S[i, j]`, `i < j`, to lower triangular blocks) and
 check `r` is less than `size(S[i, j], 1)`. If `make_Sii_zero = true`, fill 
-diagonal blocsk `S[i, i]` by zeros. This is useful in certain applications.
+diagonal blocsk `S[i, i]` by zeros; this is useful in certain applications.
 """
 function verify_input_data!(
 	S             :: AbstractMatrix{<:AbstractMatrix},
@@ -50,8 +50,8 @@ end
 """
 	identify!(O::Vector{Matrix})
 
-Fix identifiability of rectangular orthogonal matrices `O[1], ..., O[end]`, where
-`O[i]' * O[i] = eye(r)`, by reducing `O[end]` into a lower triangular matrix with
+Fix identifiability of rectangular orthogonal matrices `O[1],..., O[end]`, where
+`O[i]'O[i] = I(r)`, by reducing `O[end]` into a lower triangular matrix with
 positive diagonal entries. When `O[end]` is a square matrix, it will be
 reduced to the identity matrix.
 """
@@ -98,9 +98,9 @@ symmetric, and `S[j, i] = S[i, j]'`.
 
 # Keyword arguments
 - `αinv    :: Number`: proximal update constant ``1/α```, default is `1e-3`.
-- `maxiter :: Integer`: maximum number of iterations, default is `1000`.
-- `tolfun  :: Number`: tolerance for objective convergence, default is `1e-8`.
-- `tolvar  :: Number`: tolerance for iterate convergence, default is `1e-6`.
+- `maxiter :: Integer`: maximum number of iterations, default is `50000`.
+- `tolfun  :: Number`: tolerance for objective convergence, default is `1e-10`.
+- `tolvar  :: Number`: tolerance for iterate convergence, default is `1e-8`.
 - `verbose :: Bool`  : verbose display, default is `false`.
 - `O       :: Vector{Matrix}`: starting point, default is `O[i] = eye(di, r)`.
 - `log     :: Bool`: record iterate history or not, defaut is `false`.
@@ -108,7 +108,7 @@ symmetric, and `S[j, i] = S[i, j]'`.
 # Output
 - `O`       : result, `O[i]` has dimension `di x r`.
 - `tracesum`: objective value evaluated at final `O`.
-- `obj`     : final objective value from PBA algorithm, should be same as `obj`.
+- `obj`     : final objective value from PBA algorithm, should be same as `tracesum`.
 - `history` : iterate history.
 """
 function otsm_pba(
@@ -177,8 +177,8 @@ end
 """
     otsm_sdp(S, r)
 
-Maximize the trace sum `2sum_{i<j} trace(Oi' * S[i, j] * Oj)` subject to the
-orthogonality constraint `Oi' * Oi == I(r)` using an SDP relaxation (P-SDP in 
+Maximize the trace sum `sum_{i,j} trace(Oi' * S[i, j] * Oj)` subject to the
+orthogonality constraint `Oi'Oi = I(r)` using an SDP relaxation (P-SDP in 
 the manuscript). Each of `S[i, j]` for `i < j` is a `di x dj` matrix and 
 `S[i, j] = S[j, i]'`.
 
@@ -200,7 +200,7 @@ function otsm_sdp(
     S̃ = cat(S) # flattened matrix
     # form and solve the SDP
     U       = Convex.Semidefinite(sum(d), sum(d))
-    problem = Convex.maximize(m * tr(S̃ * U))
+    problem = Convex.maximize((m / 2) * tr(S̃ * U))
     for i in 1:m
         ir = (sum(d[1:i-1]) + 1):sum(d[1:i])
         #problem.constraints += U[ir, ir] ⪯ I(d[i]) / m
@@ -268,7 +268,7 @@ Tolerance `tol` is used to test the positivity of the smallest eigenvalue
 of the test matrix.
 
 # Positional arguments
-- `O :: Vector{Matrix}`: a point satisifying `O[i]'O[i]=I(r)`.
+- `O :: Vector{Matrix}`: a point satisifying `O[i]'O[i] = I(r)`.
 - `S :: Matrix{Matrix}`: data matrix.
 
 # Output
@@ -277,10 +277,8 @@ by Won-Zhou-Lange (2018) and `(z2, ev2)` is the certificate result by
 Liu-Wang-Wang (2015). `z1` and `z2` can take value 
 - `:infeasible`: orthogonality constraints violated
 - `:suboptimal`: failed the first-order optimality (stationarity) condition  
-- `:stationary_point`: satisfied first-order optimality; can or can not be a
-global optimal point
-- `:nonglobal_stationary_point`: satisfied first-order optimality; cannot be a 
-global optimal point
+- `:stationary_point`: satisfied first-order optimality; may or may not be global optimal
+- `:nonglobal_stationary_point`: satisfied first-order optimality; must not be global optimal
 - `:global_optimal`: certified global optimality
 `ev1` is the minimum eigenvalue of the Won-Zhou-Lange certificate matrix. `ev2` 
 is the minimum eigenvalue of the Liu-Wang-Wang certificate matrix.

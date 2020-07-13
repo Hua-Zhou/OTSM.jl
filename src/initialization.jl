@@ -13,10 +13,11 @@ end
 """
 	init_tb(S)
 
-Compute initial point following Ten Berge's second upper bound (p. 273). This is
-same as  the Liu-Wang-Wang starting point strategy 2 (Algorithm 3.2, p. 1495).
-Take the eigenvectors corresponding to the r largest eigenvalues of S.
-This is a `D x r` orthogonal matrix, ``D=\\sum_{i=1}^m d_i``.
+Compute initial point following Ten Berge's second upper bound 
+(<https://doi.org/10.1007/BF02294053>, p. 273). This is same as the 
+Liu-Wang-Wang starting point strategy 2 (<https://doi.org/10.1137/15M100883X>, 
+Algorithm 3.2, p. 1495). Take the eigenvectors corresponding to the `r` largest 
+eigenvalues of `S`. This is a `D x r` orthogonal matrix, ``D=\\sum_{i=1}^m d_i``.
 For each `di x r` block, project to the Stiefel manifold.
 These blocks constitute an initial point.
 """
@@ -42,9 +43,9 @@ end
 """
 	init_sb(S, r)
 
-Compute initial point following Shapiro-Botha (p. 380). Fill in the diagonal 
-block of `S` with ``-\\sum_{j \\neq i} P_{ij} * D_{ij} * P_{ij}``, where 
-``P_{ij} * D_{ij} * Q_{ij}`` is the SVD of ``S_{ij}``. The resulting matrix is 
+Compute initial point following Shapiro-Botha (<https://doi.org/10.1137/0609032>, p. 380). 
+Fill in the diagonal block of `S` with ``-\\sum_{j \\neq i} P_{ij} * D_{ij} * P_{ij}``, 
+where ``P_{ij} * D_{ij} * Q_{ij}`` is the SVD of ``S_{ij}``. The resulting matrix is 
 negative semidefinite. Take the eigenvectors corresponding to the `r` largest 
 eigenvalues. This is a `D x r` orthogonal matrix, ``D=\\sum_{i=1}^m d_i``.
 For each `di x r` block, project to the Stiefel manifold.
@@ -87,8 +88,8 @@ end
 	init_lww1(S, r)
 
 Compute initial point following Liu-Wang-Wang starting point strategy 1 
-(Algorithm 3.1, p. 1494). This starting strategy applies 
-to cases where `A[i, i]` is pd, or equivalently `make_Sii_zero = false`.
+(<https://doi.org/10.1137/15M100883X>, Algorithm 3.1, p. 1494). This 
+starting strategy applies to cases where `A[i, i]` is pd.
 """
 function init_lww1(
     S :: Matrix{Matrix{T}},

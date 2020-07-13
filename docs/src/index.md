@@ -64,27 +64,29 @@ otsm_sdp
 
 ## Start point
 
-Different strategies for starting point are implemented. 
+Different strategies for starting point are implemented.
 
-1. Initialize $O_i$ by $I_r$. This is the default for the proximal block ascent algorithm `otsm_pba`.
+### Initialize $O_i$ by $I_r$. 
+
+This is the default for the proximal block ascent algorithm `otsm_pba`.
 
 ```@docs
 init_eye
 ```
 
-2. Initialize $O_i$ by a strategy by Ten Berge.
+### Initialize $O_i$ by a strategy by Ten Berge.
 
 ```@docs
 init_tb
 ```
 
-3. Initialize $O_i$ by a strategy by Liu-Wang-Wang.
+### Initialize $O_i$ by a strategy by Liu-Wang-Wang.
 
 ```@docs
 init_lww1
 ```
 
-4. Initialize $O_i$ by a strategy by Shapiro-Botha (p. 380).
+### Initialize $O_i$ by a strategy by Shapiro-Botha.
 
 ```@docs
 init_sb
