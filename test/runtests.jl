@@ -17,7 +17,7 @@ A, maxdiff_optim, _ = portwine_data()
 Smaxdiff = [A[i]'A[j] for i in 1:4, j in 1:4]
 OTSM.verify_input_data!(Smaxdiff, 3, true) # set S[i, i] to 0
 for r in 1:3
-    for init_fun in [init_eye, init_sb, init_tb]        
+    for init_fun in [init_eye, init_sb, init_tb]
         @info "rank = $r, init = $init_fun"
         @time Ô_ba, ts_ba, = otsm_pba(Smaxdiff, r; 
             verbose = true, O = init_fun(Smaxdiff, r))
@@ -36,13 +36,13 @@ end
 A, _, maxbet_optim = portwine_data()
 Smaxbet = [A[i]'A[j] for i in 1:4, j in 1:4]
 for r in 1:3
-    for init_fun in [init_eye, init_sb, init_tb]        
+    for init_fun in [init_eye, init_sb, init_tb, init_lww1]
         @info "rank = $r, init = $init_fun"
         @time Ô_ba, ts_ba, = otsm_pba(Smaxbet, r; 
             verbose = true, O = init_fun(Smaxbet, r))
         @show ts_ba
-        if r == 3 && init_fun == init_eye
-            # r=3, init=init_eye leads to an inferior local maximum
+        if r == 3 && init_fun ∈ [init_eye, init_lww1]
+            # r=3, init=init_eye or init_lww1 leads to an inferior local maximum
             @test ts_ba ≈ 818.7063749651282
         else
             @test ts_ba ≈ maxbet_optim[r]
@@ -79,7 +79,7 @@ Random.seed!(123)
 n, d, m = 10, 3, 50
 A, S, Ā, A_manopt = generate_procrustes_data(m, n, d)
 @info "Proximal block ascent algorithm:"
-for init_fun in [init_eye, init_sb, init_tb]        
+for init_fun in [init_eye, init_sb, init_tb]
     @info "init = $init_fun"
     @time Ô_ba, ts_ba, = otsm_pba(S, d; verbose = true, O = init_fun(S, d))
     @show ts_ba
@@ -115,7 +115,7 @@ for i in 1:length(ns)
     end
 end
 @info "Proximal block ascent algorithm:"
-for init_fun in [init_eye, init_tb, init_lww1]
+for init_fun in [init_eye, init_sb, init_tb, init_lww1]
     @info "init = $init_fun"
     @time Ô_ba, ts_ba, = otsm_pba(S, r; verbose = true, O = init_fun(S, r))
     if init_fun == init_eye
@@ -147,7 +147,7 @@ for i in 1:length(ns)
     end
 end
 @info "Proximal block ascent algorithm:"
-for init_fun in [init_eye, init_tb, init_lww1]
+for init_fun in [init_eye, init_sb, init_tb, init_lww1]
     @info "init = $init_fun"
     @time Ô_ba, ts_ba, = otsm_pba(S, r; verbose = true, O = init_fun(S, r))
     @test abs(ts_ba - 378.9624) < 1e-3
