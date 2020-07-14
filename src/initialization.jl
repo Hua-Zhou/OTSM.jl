@@ -57,15 +57,14 @@ function init_sb(
     r :: Integer
     ) where T <: BlasReal
 	m    = size(S, 1)
-    SS   = copy(S) # note SS[i,j] and S[i,j] point to same data
+    SS   = similar(S)
     Ssvd = [svd(S[i, j]) for i in 1:m, j in 1:m] # wasteful, not using symmetry
     @inbounds for i in 1:m
-        # now SS[i,i] points to diff data than S[i,i], so we are not worrried
-        # changing data in S[i, i]
-        SS[i, i] = copy(SS[i, i])
-		for j in 1:m
+        SS[i, i] = copy(S[i, i])
+        for j in 1:m
+            (j ≠ i) && (SS[i, j] = copy(S[i, j]))
             svdij      = Ssvd[i, j]
-			SS[i, i] .-= svdij.U * Diagonal(svdij.S) * transpose(svdij.U)
+            SS[i, i] .-= svdij.U * Diagonal(svdij.S) * transpose(svdij.U)
 		end
 	end
 	# only need evecs corresponding to largest r evals
@@ -73,7 +72,7 @@ function init_sb(
     O = Vector{Matrix{T}}(undef, m)
     rowoffset = 0
 	@inbounds for i in 1:m
-		di     = size(SS[i,i], 1)
+		di     = size(SS[i, i], 1)
 		rowidx = rowoffset+1:rowoffset+di
         Visvd  = svd!(V[rowidx, :])
         O[i]   = Visvd.U * Visvd.Vt
