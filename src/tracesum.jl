@@ -329,8 +329,18 @@ function test_optimality(
         end
     end
     # check global optimality by Won-Zhou-Lange certificate
-    λmin1 = eigmin(Symmetric(cat(C1)))    
-    z1    = λmin1 > -abs(tol) ? :global_optimal : :stationary_point
+    λmin1 = eigmin(Symmetric(cat(C1)))
+    if λmin1 > -abs(tol)
+        z1 = :global_optimal
+    elseif m == 2 && r == 1 
+        # Won-Zhou-Lange certificate is necessary for m=2, r=1
+        z1 = :nonglobal_stationary_point
+    elseif m == 2 && all([S[i, i] ≈ 0I for i in 1:m])
+        # Won-Zhou-Lange certificate is necessary for m=2, MAXDIFF
+        z1 = :nonglobal_stationary_point
+    else
+        z1 = :stationary_point
+    end
     # check global optimality by Liu-Wang-Wang certificate
     λmin2 = eigmin(Symmetric(cat(C2)))
     z2    = λmin2 > -abs(tol) ? :global_optimal : :stationary_point
