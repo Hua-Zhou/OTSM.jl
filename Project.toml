@@ -1,6 +1,6 @@
 name = "OTSM"
 uuid = "673cdf0f-6752-4a08-b918-e94a550f1aff"
-keywords = ["maxbet", "maxdet", "Procurstes", "  little  Grothendieck problem"]
+keywords = ["maxbet", "maxdet", "Procrustes", "little  Grothendieck problem"]
 authors = ["Joong-Ho Won <wonj@stats.snu.ac.kr>", "Hua Zhou <huazhou@ucla.edu>"]
 version = "0.0.3"
 

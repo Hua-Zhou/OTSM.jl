@@ -302,7 +302,7 @@ function test_optimality(
         mul!(Λi, transpose(O[i]), O[i])
         Λi ≈ I || 
             (return (:infeasible, T(NaN)), (:infeasible, T(NaN)))
-        # Λi = O[i] * \sum_j S[i, j] * O[j]
+        # Λi = O[i]' * \sum_j S[i, j] * O[j]
         mul!(Λi, transpose(O[i]), SO[i])
         # check symmetry of Λi (first order optimality condition)
         δi = check_symmetry(Λi)
