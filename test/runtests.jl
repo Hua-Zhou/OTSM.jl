@@ -114,12 +114,16 @@ S     = [A[start[i]:stop[i], start[j]:stop[j]] for i in 1:m, j in 1:m]
 for init_fun in [init_eye, init_sb, init_tb, init_lww1]
     @info "init = $init_fun"
     @time Ô_ba, ts_ba, = otsm_pba(S, r; verbose = true, O = init_fun(S, r))
+    @show test_optimality(Ô_ba, S)
     if init_fun == init_eye
         # init_eye leads to a inferior local maximum
-        @show test_optimality(Ô_ba, S)
         @test abs(ts_ba - 14.10123) < 1e-3
+    elseif init_fun == init_sb
+        # the test matrix by Shapiro-Botha (init_sb) is singular with largest eigenvalue
+        # 0 (with multiplicity 3). Different machines give different init_sb. Some of 
+        # them lead to inferior local maximum.
+        @test abs(ts_ba - 14.10123) < 1e-3 || abs(ts_ba - 14.73022) < 1e-3
     else
-        @show test_optimality(Ô_ba, S)
         @test abs(ts_ba - 14.73022) < 1e-3
     end
 end
