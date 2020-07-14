@@ -66,27 +66,27 @@ otsm_sdp
 
 Different strategies for starting point are implemented.
 
-### Initialize $O_i$ by $I_r$. 
-
-This is the default for the proximal block ascent algorithm `otsm_pba`.
+### Initialize $O_i$ by $I_r$
 
 ```@docs
 init_eye
 ```
 
-### Initialize $O_i$ by a strategy by Ten Berge.
+### Initialize $O_i$ by a strategy by Ten Berge (default)
+
+This is the default for the proximal block ascent algorithm `otsm_pba`.
 
 ```@docs
 init_tb
 ```
 
-### Initialize $O_i$ by a strategy by Liu-Wang-Wang.
+### Initialize $O_i$ by a strategy by Liu-Wang-Wang 
 
 ```@docs
 init_lww1
 ```
 
-### Initialize $O_i$ by a strategy by Shapiro-Botha.
+### Initialize $O_i$ by a strategy by Shapiro-Botha and Won-Zhou-Lange
 
 ```@docs
 init_sb
@@ -302,15 +302,14 @@ Proximal block ascent algorithm for finding a rank $r=2$ solution to MAXDIFF.
 Ô_pba, ts_pba, obj, history = otsm_pba(Smaxdiff, 2; verbose = true);
 ```
 
-    iter = 1, obj = 110.25
-    iter = 2, obj = 533.6042318034453
-    iter = 3, obj = 542.2027792984238
-    iter = 4, obj = 542.3265730402211
-    iter = 5, obj = 542.3275463498419
-    iter = 6, obj = 542.3275506295132
-    iter = 7, obj = 542.327550638136
-    iter = 8, obj = 542.3275506383478
-    iter = 9, obj = 542.3275506383521
+    iter = 1, obj = 539.8501989834106
+    iter = 2, obj = 542.2346791607897
+    iter = 3, obj = 542.326755374587
+    iter = 4, obj = 542.3275270111226
+    iter = 5, obj = 542.327550329459
+    iter = 6, obj = 542.3275506362339
+    iter = 7, obj = 542.3275506383457
+    iter = 8, obj = 542.3275506383522
 
 
 The `test_optimality()` function attempts to certify whether a local solution `O::Vector{Matrix}` is a global solution. The first output indicates the solution is `:infeasible`, `:suboptimal`, `:stationary_point`, or `:global_optimal`.
@@ -324,7 +323,7 @@ test_optimality(Ô_pba, Smaxdiff)[1]
 
 
 
-    (:global_optimal, 5.479244488258054e-16)
+    (:global_optimal, -3.507576956770025e-14)
 
 
 
@@ -474,36 +473,34 @@ Proximal block ascent algorithm for finding a rank $r=2$ solution to MAXBET.
 Ô_pba, ts_pba, obj, history = otsm_pba(Smaxbet, 2; verbose = true);
 ```
 
-    iter = 1, obj = 277.375
-    iter = 2, obj = 764.1356726873341
-    iter = 3, obj = 778.7331067492262
-    iter = 4, obj = 779.6549606655808
-    iter = 5, obj = 779.7384589334283
-    iter = 6, obj = 779.7524622915565
-    iter = 7, obj = 779.7559335371038
-    iter = 8, obj = 779.7568884016266
-    iter = 9, obj = 779.7571562628467
-    iter = 10, obj = 779.7572317387999
-    iter = 11, obj = 779.7572530443673
-    iter = 12, obj = 779.7572590648325
-    iter = 13, obj = 779.7572607671433
-    iter = 14, obj = 779.7572612486537
-    iter = 15, obj = 779.7572613848802
-    iter = 16, obj = 779.7572614234249
-    iter = 17, obj = 779.7572614343316
-    iter = 18, obj = 779.7572614374178
-    iter = 19, obj = 779.7572614382912
-    iter = 20, obj = 779.7572614385383
-    iter = 21, obj = 779.7572614386082
-    iter = 22, obj = 779.7572614386279
-    iter = 23, obj = 779.7572614386337
-    iter = 24, obj = 779.757261438635
-    iter = 25, obj = 779.757261438636
-    iter = 26, obj = 779.7572614386361
-    iter = 27, obj = 779.7572614386356
+    iter = 1, obj = 769.5257682063867
+    iter = 2, obj = 778.9896186367976
+    iter = 3, obj = 779.6705236544665
+    iter = 4, obj = 779.7414861674778
+    iter = 5, obj = 779.7533232474
+    iter = 6, obj = 779.756174278359
+    iter = 7, obj = 779.7569547275209
+    iter = 8, obj = 779.7571745803215
+    iter = 9, obj = 779.7572368336034
+    iter = 10, obj = 779.7572544704886
+    iter = 11, obj = 779.7572594658141
+    iter = 12, obj = 779.7572608802018
+    iter = 13, obj = 779.757261280583
+    iter = 14, obj = 779.757261393906
+    iter = 15, obj = 779.7572614259773
+    iter = 16, obj = 779.7572614350538
+    iter = 17, obj = 779.7572614376222
+    iter = 18, obj = 779.7572614383489
+    iter = 19, obj = 779.7572614385546
+    iter = 20, obj = 779.7572614386127
+    iter = 21, obj = 779.7572614386298
+    iter = 22, obj = 779.7572614386339
+    iter = 23, obj = 779.7572614386349
+    iter = 24, obj = 779.7572614386353
+    iter = 25, obj = 779.7572614386356
 
 
-This local solution is certified to be global optimal.
+This solution is certified to be global optimal.
 
 
 ```julia
@@ -514,6 +511,6 @@ test_optimality(Ô_pba, Smaxbet)[1]
 
 
 
-    (:global_optimal, 1.7821236672382104e-14)
+    (:global_optimal, 6.830358875212792e-15)
 
 

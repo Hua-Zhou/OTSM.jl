@@ -102,7 +102,7 @@ symmetric, and `S[j, i] = S[i, j]'`.
 - `tolfun  :: Number`: tolerance for objective convergence, default is `1e-10`.
 - `tolvar  :: Number`: tolerance for iterate convergence, default is `1e-8`.
 - `verbose :: Bool`  : verbose display, default is `false`.
-- `O       :: Vector{Matrix}`: starting point, default is `O[i] = eye(di, r)`.
+- `O       :: Vector{Matrix}`: starting point, default is `init_tb(S, r)`.
 - `log     :: Bool`: record iterate history or not, defaut is `false`.
 
 # Output
@@ -120,7 +120,7 @@ function otsm_pba(
     tolvar   :: Number  = 1e-8,
     verbose  :: Bool    = false,
     log      :: Bool    = false,
-    O        :: Vector{Matrix{T}} = init_eye(S, r)
+    O        :: Vector{Matrix{T}} = init_tb(S, r)
     ) where T <: BlasReal
     m = size(S, 1)
     d = [size(S[i, i], 1) for i in 1:m] # (d[i], d[j]) = size(S[i, j])

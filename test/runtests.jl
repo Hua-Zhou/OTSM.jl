@@ -104,16 +104,12 @@ A = [4.3299 2.3230 -1.3711 -0.0084 -0.7414;
 -1.3711 1.0959 6.4920 -1.9883 -0.1878;
 -0.0084 0.1285 -1.9883 2.4591 1.8463;
 -0.7414 0.0727 -0.1878 1.8463 5.8875]
-ns = [2, 3]
-r = 1
+ns    = [2, 3]
+m     = length(ns)
+r     = 1
 start = [1; cumsum(ns)[1:end-1] .+ 1]
 stop  = cumsum(ns)
-S = Matrix{Matrix{Float64}}(undef, length(ns), length(ns))
-for i in 1:length(ns)
-    for j in 1:length(ns)
-        S[i, j] = A[start[i]:stop[i], start[j]:stop[j]]
-    end
-end
+S     = [A[start[i]:stop[i], start[j]:stop[j]] for i in 1:m, j in 1:m]
 @info "Proximal block ascent algorithm:"
 for init_fun in [init_eye, init_sb, init_tb, init_lww1]
     @info "init = $init_fun"
@@ -130,22 +126,18 @@ end
 end
 
 @testset "MaxBet (Liu-Wang-Wang Example 5.2)" begin
-A = [45 -20 5 6 16 3;
+A = Float64.([45 -20 5 6 16 3;
 -20 77 -20 -25 -8 -21;
 5 -20 74 47 18 -32;
 6 -25 47 54 7 -11;
 16 -8 18 7 21 -7;
-3 -21 -32 -11 -7 70]
-ns = [2, 2, 2]
-r = 1
+3 -21 -32 -11 -7 70])
+ns    = [2, 2, 2]
+m     = length(ns)
+r     = 1
 start = [1; cumsum(ns)[1:end-1] .+ 1]
 stop  = cumsum(ns)
-S = Matrix{Matrix{Float64}}(undef, length(ns), length(ns))
-for i in 1:length(ns)
-    for j in 1:length(ns)
-        S[i, j] = A[start[i]:stop[i], start[j]:stop[j]]
-    end
-end
+S     = [A[start[i]:stop[i], start[j]:stop[j]] for i in 1:m, j in 1:m]
 @info "Proximal block ascent algorithm:"
 for init_fun in [init_eye, init_sb, init_tb, init_lww1]
     @info "init = $init_fun"
