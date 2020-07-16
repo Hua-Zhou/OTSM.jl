@@ -1,7 +1,8 @@
 module PkgTest
 
 using BenchmarkTools, Random, Statistics, Test, OTSM
-using COSMO, SCS#, MosekTools
+using COSMO, SCS #, MosekTools
+using LinearAlgebra
 
 @testset "cat" begin
 A = Matrix{Matrix{Int}}(undef, 2, 2)
@@ -16,16 +17,14 @@ end
 A, maxdiff_optim, _ = portwine_data()
 Smaxdiff = [A[i]'A[j] for i in 1:4, j in 1:4]
 OTSM.verify_input_data!(Smaxdiff, 3, true) # set S[i, i] to 0
-for r in 1:3
-    for init_fun in [init_eye, init_sb, init_tb]
-        @info "rank = $r, init = $init_fun"
-        @time Ô_ba, ts_ba, = otsm_pba(Smaxdiff, r; 
-            verbose = true, O = init_fun(Smaxdiff, r))
-        @show ts_ba
-        @test ts_ba ≈ maxdiff_optim[r]
-        @show test_optimality(Ô_ba, Smaxdiff, method = :wzl)[[1, end]]
-        @show test_optimality(Ô_ba, Smaxdiff, method = :lww)[[1, end]]
-    end
+for r in 1:3, init_fun in [init_eye, init_sb, init_tb]
+    @info "rank = $r, init = $init_fun"
+    @time Ô_ba, ts_ba, = otsm_pba(Smaxdiff, r; 
+    verbose = true, O = init_fun(Smaxdiff, r))
+    @show ts_ba
+    @test ts_ba ≈ maxdiff_optim[r]
+    @show test_optimality(Ô_ba, Smaxdiff, method = :wzl)[[1, end]]
+    @show test_optimality(Ô_ba, Smaxdiff, method = :lww)[[1, end]]
 end
 # bm = @benchmark tsm_ba(S, 1)
 # display(bm); println()
@@ -34,22 +33,20 @@ end
 @testset "otsm_pba (port wine, MAXBET)" begin
 A, _, maxbet_optim = portwine_data()
 Smaxbet = [A[i]'A[j] for i in 1:4, j in 1:4]
-for r in 1:3
-    for init_fun in [init_eye, init_sb, init_tb, init_lww1]
-        @info "rank = $r, init = $init_fun"
-        @time Ô_ba, ts_ba, = otsm_pba(Smaxbet, r; 
-            verbose = true, O = init_fun(Smaxbet, r))
-        @show ts_ba
-        if r == 3 && init_fun ∈ [init_eye, init_lww1]
-            # r=3, init=init_eye or init_lww1 leads to an inferior local maximum
-            @test ts_ba ≈ 818.7063749651282
-        else
-            @test ts_ba ≈ maxbet_optim[r]
-        end
-        # check global optimality certificate
-        @show test_optimality(Ô_ba, Smaxbet, method = :wzl)[[1, end]]
-        @show test_optimality(Ô_ba, Smaxbet, method = :lww)[[1, end]]
+for r in 1:3, init_fun in [init_eye, init_sb, init_tb, init_lww1]
+    @info "rank = $r, init = $init_fun"
+    @time Ô_ba, ts_ba, = otsm_pba(Smaxbet, r; 
+    verbose = true, O = init_fun(Smaxbet, r))
+    @show ts_ba
+    if r == 3 && init_fun ∈ [init_eye, init_lww1]
+        # r=3, init=init_eye or init_lww1 leads to an inferior local maximum
+        @test ts_ba ≈ 818.7063749651282
+    else
+        @test ts_ba ≈ maxbet_optim[r]
     end
+    # check global optimality certificate
+    @show test_optimality(Ô_ba, Smaxbet, method = :wzl)[[1, end]]
+    @show test_optimality(Ô_ba, Smaxbet, method = :lww)[[1, end]]
 end
 # bm = @benchmark tsm_ba(S, 1)
 # display(bm); println()
@@ -62,7 +59,7 @@ OTSM.verify_input_data!(Smaxdiff, 3, true) # set S[i, i] to 0
 for r in 1:3
     for solver in [
         #Mosek.Optimizer(LOG=0),
-        COSMO.Optimizer(max_iter=5000, verbose=false),
+        COSMO.Optimizer(max_iter=5000, verbose=false), # takes long at r = 1
         SCS.Optimizer(verbose=0)
         ]
         @info "rank = $r, solver = $solver"
@@ -149,6 +146,22 @@ for init_fun in [init_eye, init_sb, init_tb, init_lww1]
     @test abs(ts_ba - 378.9624) < 1e-3
     @show test_optimality(Ô_ba, S, method = :wzl)[[1, end]]
     @show test_optimality(Ô_ba, S, method = :lww)[[1, end]]
+end
+end
+
+@testset "Ten Berge 1977 p270" begin
+m    = 3
+d    = 3
+A    = Vector{Matrix{Float64}}(undef, d)
+A[1] = Matrix([Matrix(I, d, d); Matrix(I, d, d); zeros(d, d)])
+A[2] = Matrix([-Matrix(I, d, d); zeros(d, d); Matrix(I, d, d)])
+A[3] = Matrix([zeros(d, d); Matrix(I, d, d); Matrix(I, d, d)])
+Stb  = [A[i]'A[j] for i in 1:m, j in 1:m]
+OTSM.verify_input_data!(Stb, 1, true) # make it MAXDIFF
+for r in 1:3, init in [init_eye, init_tb, init_sb]
+    Ô_ba, ts_ba, obj_ba, history = otsm_pba(Stb, r; verbose = false, log = true, O = init(Stb, r))
+    println("r = $r, init = $init, obj = $ts_ba, niters = $(length(history[:tracesum]))")
+    @show test_optimality(Ô_ba, Stb)[1]
 end
 end
 

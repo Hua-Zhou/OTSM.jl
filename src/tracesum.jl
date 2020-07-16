@@ -69,11 +69,10 @@ function identify!(O::Array{Matrix{T}}) where T
         end
     elseif size(O[end], 1) > size(O[end], 2) # O[end] is rectangular
         L, Q = lq(O[end])      # LQ decomposition of Q[end]
-        ds   = sign.(diag(L))  # sign of diagonal of L
+        ds = [L[i, i] ≥ 0 ? 1 : -1 for i in 1:size(O[end], 2)]
         rmul!(L, Diagonal(ds)) # make diagonal entries of L to be positive
         @inbounds for i in 1:(m - 1)
-            copyto!(tmp[i], O[i])
-            mul!(O[i], tmp[i], transpose(Q))
+            mul!(O[i], copyto!(tmp[i], O[i]), transpose(Q))
             rmul!(O[i], Diagonal(ds))
         end
         copyto!(O[end], L)
