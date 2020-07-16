@@ -259,7 +259,7 @@ function otsm_sdp(
 end
 
 """
-	test_optimality(O::Vector{Matrix}, S::Matrix{Matrix}; tol)
+	test_optimality(O::Vector{Matrix}, S::Matrix{Matrix}; tol=1e-3, method=:wzl)
 
 Test if the vector of orthogonal matrices `O` is globally optimal. The `O` is 
 assumed to satisfy the first-order optimality conditions. Each of `O[i]` is a 
@@ -268,83 +268,106 @@ Tolerance `tol` is used to test the positivity of the smallest eigenvalue
 of the test matrix.
 
 # Positional arguments
-- `O :: Vector{Matrix}`: a point satisifying `O[i]'O[i] = I(r)`.
-- `S :: Matrix{Matrix}`: data matrix.
+- `O :: Vector{Matrix}`: A point satisifying `O[i]'O[i] = I(r)`.
+- `S :: Matrix{Matrix}`: Data matrix.
+
+# Keyword arguments
+- `tol     :: Number`: Tolerance for testing psd of the test matrix.  
+- `method  :: Symbol`: `:wzl` (Theorem 3.1 of Won-Zhou-Lange <https://arxiv.org/abs/1811.03521>) 
+    or `:lww` (Theorem 2.4 of Liu-Wang-Wang <https://doi.org/10.1137/15M100883X>)
 
 # Output
-A tuple `(z1, ev1), (z2, ev2)`, where `(z1, ev1)` is the certificate result 
-by Won-Zhou-Lange (2018) and `(z2, ev2)` is the certificate result by 
-Liu-Wang-Wang (2015). `z1` and `z2` can take value 
-- `:infeasible`: orthogonality constraints violated
-- `:suboptimal`: failed the first-order optimality (stationarity) condition  
-- `:stationary_point`: satisfied first-order optimality; may or may not be global optimal
-- `:nonglobal_stationary_point`: satisfied first-order optimality; must not be global optimal
-- `:global_optimal`: certified global optimality
-`ev1` is the minimum eigenvalue of the Won-Zhou-Lange certificate matrix. `ev2` 
-is the minimum eigenvalue of the Liu-Wang-Wang certificate matrix.
+- `status :: Symbol`: A certificate that 
+    - `:infeasible`: orthogonality constraints violated
+    - `:suboptimal`: failed the first-order optimality (stationarity) condition  
+    - `:stationary_point`: satisfied first-order optimality; may or may not be global optimal
+    - `:nonglobal_stationary_point`: satisfied first-order optimality; must not be global optimal
+    - `:global_optimal`: certified global optimality
+- `Λ      :: Vector{Matrix}`: Lagrange multipliers.
+- `C      :: Matrix{Matrix}`: Certificate matrix corresponding to `method`.
+- `λmin   :: Number`: The minimum eigenvalue of the certificate matrix.
 """
 function test_optimality(
-    O   :: Vector{Matrix{T}},
-    S   :: Matrix{Matrix{T}},
-    tol :: Number = 1e-3
+    O      :: Vector{Matrix{T}},
+    S      :: Matrix{Matrix{T}};
+    tol    :: Number = 1e-3,
+    method :: Symbol = :wzl
     ) where T <: BlasReal
     r  = size(O[1], 2)
     m  = size(S, 1)
-    SO = S * O 	# SO[i] = sum_{j} S_{ij} O_j
-	Λi = Matrix{T}(undef, r, r)
-    # certificate matrix for Won-Zhou-Lange approach (Theorem 3.1)
-    C1  = copy(-S) 
-    # certificate matrix for Liu-Wang-Wang approach (Theorem 2.4, p1493)
-    C2 = [-kron(S[i, j], Matrix(I, r, r)) for i in 1:m, j in 1:m]
+    # SO[i] = sum_{j} S_{ij} O_j
+    SO = S * O 	
+    # Langrange multiplier
+    Λ  = [transpose(O[i]) * SO[i] for i in 1:m]
+    storage_rr = Matrix{T}(undef, r, r)
+    # check constraint satisfication and first order optimality
     @inbounds for i in 1:m
-        ni = size(O[i], 1)
         # check constraint satisfication O[i]'O[i] = I(r)
-        mul!(Λi, transpose(O[i]), O[i])
-        Λi ≈ I || 
-            (return (:infeasible, T(NaN)), (:infeasible, T(NaN)))
-        # Λi = O[i]' * \sum_j S[i, j] * O[j]
-        mul!(Λi, transpose(O[i]), SO[i])
+        mul!(storage_rr, transpose(O[i]), O[i])
+        storage_rr ≈ I || (return :infeasible, Λ, Matrix{Matrix{T}}(m, m), T(NaN))
         # check symmetry of Λi (first order optimality condition)
-        δi = check_symmetry(Λi)
+        δi = check_symmetry(Λ[i])
         if δi > abs(tol)
             @warn "Λ$i not symmetric; norm(Λ - Λ') = $δi; " *
                 "first order optimality not satisfied"
-            return (:suboptimal, T(NaN)), (:suboptimal, T(NaN))
+            return :suboptimal, Λ, Matrix{Matrix{T}}(m, m), T(NaN)
         end
+    end
+    # certify global optimality
+    if method == :wzl
+        # Won-Zhou-Lange certificate matrix (Theorem 3.1)
+        C  = copy(-S)
+        @inbounds for i in 1:m
+            ni = size(O[i], 1)
+            # if eigmin(Λi) < 0, then it cannot be global optimal
+            λmin = minimum(eigvals!(Symmetric(copyto!(storage_rr, Λ[i]))))
+            if λmin < -abs(tol)
+                return :nonglobal_stationary_point, Λ, Matrix{T}(0, 0), T(NaN)
+            end
+            # update certificate matrix by Won-Zhou-Lange
+            copyto!(storage_rr, Λ[i])
+            for j in 1:r
+                storage_rr[j, j] -= λmin
+            end
+            C[i, i] .+= O[i] * Symmetric(storage_rr) * transpose(O[i])
+            for k in 1:ni
+                C[i, i][k, k] += λmin
+            end
+        end
+        λmin = eigmin(Symmetric(cat(C)))
+        if λmin > -abs(tol)
+            status = :global_optimal
+        elseif m == 2 && r == 1 
+            # Won-Zhou-Lange certificate is necessary for m=2, r=1
+            status = :nonglobal_stationary_point
+        elseif m == 2 && all([S[i, i] ≈ 0I for i in 1:m])
+            # Won-Zhou-Lange certificate is necessary for m=2, MAXDIFF
+            status = :nonglobal_stationary_point
+        else
+            status = :stationary_point
+        end
+        return status, Λ, C, λmin
+    elseif method == :lww
+        C  = [-kron(S[i, j], Matrix(I, r, r)) for i in 1:m, j in 1:m]
         # update certificate matrix by Liu-Wang-Wang
-        C2[i, i] += kron(Matrix(I, ni, ni), Λi)
-        # if eigmin(Λi) < 0, then it cannot be global optimal
-		λmin = eigmin(Symmetric(Λi))
-        if λmin < -abs(tol)
-            return (:nonglobal_stationary_point, T(NaN)), 
-                (:nonglobal_stationary_point, T(NaN))
+        @inbounds for i in 1:m
+            ni = size(O[i], 1)
+            C[i, i] += kron(Matrix(I, ni, ni), Λ[i])
         end
-        # update certificate matrix by Won-Zhou-Lange
-        for j in 1:r
-            Λi[j, j] -= λmin
+        λmin = eigmin(Symmetric(cat(C)))
+        if λmin > -abs(tol)
+            status = :global_optimal
+        elseif m == 2 && r == 1
+            # Won-Zhou-Lange certificate is necessary for m=2, r=1
+            status = :nonglobal_stationary_point
+        else
+            status = :stationary_point
         end
-        C1[i, i] .+= O[i] * Symmetric(Λi) * transpose(O[i])
-        for k in 1:ni
-            C1[i, i][k, k] += λmin
-        end
-    end
-    # check global optimality by Won-Zhou-Lange certificate
-    λmin1 = eigmin(Symmetric(cat(C1)))
-    if λmin1 > -abs(tol)
-        z1 = :global_optimal
-    elseif m == 2 && r == 1 
-        # Won-Zhou-Lange certificate is necessary for m=2, r=1
-        z1 = :nonglobal_stationary_point
-    elseif m == 2 && all([S[i, i] ≈ 0I for i in 1:m])
-        # Won-Zhou-Lange certificate is necessary for m=2, MAXDIFF
-        z1 = :nonglobal_stationary_point
+        return status, Λ, C, λmin
     else
-        z1 = :stationary_point
+        error("unrecognized certificate method $method; should be `:wzl` or `:lww`")
     end
-    # check global optimality by Liu-Wang-Wang certificate
-    λmin2 = eigmin(Symmetric(cat(C2)))
-    z2    = λmin2 > -abs(tol) ? :global_optimal : :stationary_point
-    return (z1, λmin1), (z2, λmin2)
+    return :unknown, Λ, Matrix{Matrix{T}}(m, m), T(NaN)
 end
 
 """

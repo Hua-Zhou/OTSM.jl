@@ -23,9 +23,8 @@ for r in 1:3
             verbose = true, O = init_fun(Smaxdiff, r))
         @show ts_ba
         @test ts_ba ≈ maxdiff_optim[r]
-        @show test_optimality(Ô_ba, Smaxdiff)
-        # @test z1 == :global_optimal
-        # @test z2 == :global_optimal
+        @show test_optimality(Ô_ba, Smaxdiff, method = :wzl)[[1, end]]
+        @show test_optimality(Ô_ba, Smaxdiff, method = :lww)[[1, end]]
     end
 end
 # bm = @benchmark tsm_ba(S, 1)
@@ -48,7 +47,8 @@ for r in 1:3
             @test ts_ba ≈ maxbet_optim[r]
         end
         # check global optimality certificate
-        @show test_optimality(Ô_ba, Smaxbet)
+        @show test_optimality(Ô_ba, Smaxbet, method = :wzl)[[1, end]]
+        @show test_optimality(Ô_ba, Smaxbet, method = :lww)[[1, end]]
     end
 end
 # bm = @benchmark tsm_ba(S, 1)
@@ -69,7 +69,6 @@ for r in 1:3
         @time Ô_sdp, ts_sdp, = otsm_sdp(Smaxdiff, r, solver = solver)
         @show ts_sdp
         @test ts_sdp ≈ maxdiff_optim[r]
-        @show test_optimality(Ô_sdp, Smaxdiff)
     end
 end
 end
@@ -83,7 +82,8 @@ for init_fun in [init_eye, init_sb, init_tb]
     @info "init = $init_fun"
     @time Ô_ba, ts_ba, = otsm_pba(S, d; verbose = true, O = init_fun(S, d))
     @show ts_ba
-    @show test_optimality(Ô_ba, S)
+    @show test_optimality(Ô_ba, S, method = :wzl)[[1, end]]
+    @show test_optimality(Ô_ba, S, method = :lww)[[1, end]]
 end
 @info "SDP relaxation (failed to find global solution):"
 for solver in [
@@ -94,7 +94,6 @@ for solver in [
     @info "solver = $solver"
     @time Ô_sdp, ts_sdp, = otsm_sdp(S, d, solver = solver)
     @show ts_sdp
-    @show test_optimality(Ô_sdp, S)
 end
 end
 
@@ -114,7 +113,8 @@ S     = [A[start[i]:stop[i], start[j]:stop[j]] for i in 1:m, j in 1:m]
 for init_fun in [init_eye, init_sb, init_tb, init_lww1]
     @info "init = $init_fun"
     @time Ô_ba, ts_ba, = otsm_pba(S, r; verbose = true, O = init_fun(S, r))
-    @show test_optimality(Ô_ba, S)
+    @show test_optimality(Ô_ba, S, method = :wzl)[[1, end]]
+    @show test_optimality(Ô_ba, S, method = :lww)[[1, end]]
     if init_fun == init_eye
         # init_eye leads to a inferior local maximum
         @test abs(ts_ba - 14.10123) < 1e-3
@@ -147,7 +147,8 @@ for init_fun in [init_eye, init_sb, init_tb, init_lww1]
     @info "init = $init_fun"
     @time Ô_ba, ts_ba, = otsm_pba(S, r; verbose = true, O = init_fun(S, r))
     @test abs(ts_ba - 378.9624) < 1e-3
-    @show test_optimality(Ô_ba, S)
+    @show test_optimality(Ô_ba, S, method = :wzl)[[1, end]]
+    @show test_optimality(Ô_ba, S, method = :lww)[[1, end]]
 end
 end
 
