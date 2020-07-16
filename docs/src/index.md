@@ -323,7 +323,7 @@ test_optimality(Ô_pba, Smaxdiff)[1]
 
 
 
-    (:global_optimal, -3.507576956770025e-14)
+    :global_optimal
 
 
 
@@ -511,6 +511,6 @@ test_optimality(Ô_pba, Smaxbet)[1]
 
 
 
-    (:global_optimal, 6.830358875212792e-15)
+    :global_optimal
 
 
