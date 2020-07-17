@@ -9,17 +9,17 @@ Concatenate an array of matrices into a single matrix. Similar to `cell2mat` in
 Matlab.
 """
 function Base.cat(A::VecOrMat{Matrix{T}}) where T
-	m = map(M -> size(M, 1), A[:, 1]) # row counts
-	n = map(M -> size(M, 2), A[1, :]) # column counts
-	out = zeros(T, sum(m), sum(n))
-	@inbounds for j in 1:length(n)
-		jr = (sum(n[1:j-1]) + 1):sum(n[1:j])
-		for i in 1:length(m)
-			ir = (sum(m[1:i-1]) + 1):sum(m[1:i])
-			out[ir, jr] = A[i, j]
-		end
-	end
-	out
+    m   = map(M -> size(M, 1), A[:, 1]) # row counts
+    n   = map(M -> size(M, 2), A[1, :]) # column counts
+    out = zeros(T, sum(m), sum(n))
+    @inbounds for j in 1:length(n)
+        jr = (sum(n[1:j-1]) + 1):sum(n[1:j])
+        for i in 1:length(m)
+            ir = (sum(m[1:i-1]) + 1):sum(m[1:i])
+            out[ir, jr] = A[i, j]
+        end
+    end
+    out
 end
 
 """
@@ -31,20 +31,20 @@ check `r` is less than `size(S[i, j], 1)`. If `make_Sii_zero = true`, fill
 diagonal blocsk `S[i, i]` by zeros; this is useful in certain applications.
 """
 function verify_input_data!(
-	S             :: AbstractMatrix{<:AbstractMatrix},
+    S             :: AbstractMatrix{<:AbstractMatrix},
     r             :: Integer,
     make_Sii_zero :: Bool = true
-	)
-	@assert size(S, 1) == size(S, 2) "size(S, 1) should be equal to size(S, 2)"
-	m = size(S, 1)
-	@inbounds for i in 1:m
-		@assert r ≤ size(S[i, i], 1) "rank r > size(S[$i, $i], 1) !"
-		make_Sii_zero == true && fill!(S[i, i], 0)
+    )
+    @assert size(S, 1) == size(S, 2) "size(S, 1) should be equal to size(S, 2)"
+    m = size(S, 1)
+    @inbounds for i in 1:m
+        @assert r ≤ size(S[i, i], 1) "rank r > size(S[$i, $i], 1) !"
+        make_Sii_zero == true && fill!(S[i, i], 0)
         for j in (i + 1):m
             S[j, i] .= transpose(S[i, j])
-		end
-	end
-	S, r
+        end
+    end
+    S, r
 end
 
 """
@@ -56,7 +56,7 @@ positive diagonal entries. When `O[end]` is a square matrix, it will be
 reduced to the identity matrix.
 """
 function identify!(O::Array{Matrix{T}}) where T
-	m   = length(O)
+    m   = length(O)
     tmp = [similar(O[i]) for i in 1:m]
     if size(O[end], 1) == size(O[end], 2) # O[end] is orthogonal matrix
         @inbounds for i in 1:(length(O) - 1)
@@ -88,7 +88,9 @@ end
 Maximize the trace sum `sum_{i,j} trace(Oi' * S[i, j] * Oj) = trace(O' * S * O)` 
 subject to  orthogonality constraint `Oi' * Oi == I(r)` by a 
 proximal block ascent algorithm. Each of `S[i, j]` for `i < j` is a
-`di x dj` matrix, `S[i, i]` are symmetric, and `S[i, j] = S[j, i]'`.
+`di x dj` matrix, `S[i, i]` are symmetric, and `S[i, j] = S[j, i]'`. Note 
+`otsm_pba` is mutating in the sense the keyword argument `O=O_init` is updated 
+with the final solution.
 
 # Positional arguments
 - `S       :: Matrix{Matrix}`: `S[i, j]` is a `di x dj` matrix, `S[i, i]` are
@@ -113,7 +115,7 @@ symmetric, and `S[j, i] = S[i, j]'`.
 function otsm_pba(
     S        :: Matrix{Matrix{T}},
     r        :: Integer;
-	αinv     :: Number  = 1e-3,
+    αinv     :: Number  = 1e-3,
     maxiter  :: Integer = 50000,
     tolfun   :: Number  = 1e-10,
     tolvar   :: Number  = 1e-8,
@@ -222,14 +224,14 @@ function otsm_sdp(
         return O, obj, T(NaN), false
     end
     Uchol = cholesky!(Symmetric(U.value), Val(true); # Cholesky with pivoting
-        check = false, tol = 1e-3maximum(diag(U.value)))
+    check = false, tol = 1e-3maximum(diag(U.value)))
     if rank(Uchol) ≤ r
         isexact = true
         for i in 1:m
             ir      = (sum(d[1:i-1]) + 1):sum(d[1:i])
             Uii     = Symmetric(U.value[ir, ir])
             Uiichol = cholesky(Uii, Val(true); 
-                check = false, tol = 1e-3maximum(diag(Uii)))
+            check = false, tol = 1e-3maximum(diag(Uii)))
             if rank(Uiichol) > r
                 isexact = false; break
             end
@@ -347,8 +349,8 @@ function test_optimality(
         end
         return status, Λ, C, λmin
     elseif method == :lww
+        # certificate by Liu-Wang-Wang 2015 (Theorem 2.4)
         C  = [-kron(S[i, j], Matrix(I, r, r)) for i in 1:m, j in 1:m]
-        # update certificate matrix by Liu-Wang-Wang
         @inbounds for i in 1:m
             ni = size(O[i], 1)
             C[i, i] += kron(Matrix(I, ni, ni), Λ[i])
@@ -366,7 +368,6 @@ function test_optimality(
     else
         error("unrecognized certificate method $method; should be `:wzl` or `:lww`")
     end
-    return :unknown, Λ, Matrix{Matrix{T}}(m, m), T(NaN)
 end
 
 """
