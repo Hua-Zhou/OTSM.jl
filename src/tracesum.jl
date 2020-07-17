@@ -303,13 +303,13 @@ function test_optimality(
     @inbounds for i in 1:m
         # check constraint satisfication O[i]'O[i] = I(r)
         mul!(storage_rr, transpose(O[i]), O[i])
-        storage_rr ≈ I || (return :infeasible, Λ, Matrix{Matrix{T}}(m, m), T(NaN))
+        storage_rr ≈ I || (return :infeasible, Λ, Matrix{Matrix{T}}(undef, m, m), T(NaN))
         # check symmetry of Λi (first order optimality condition)
         δi = check_symmetry(Λ[i])
         if δi > abs(tol)
             @warn "Λ$i not symmetric; norm(Λ - Λ') = $δi; " *
                 "first order optimality not satisfied"
-            return :suboptimal, Λ, Matrix{Matrix{T}}(m, m), T(NaN)
+            return :suboptimal, Λ, Matrix{Matrix{T}}(undef, m, m), T(NaN)
         end
     end
     # certify global optimality
@@ -321,7 +321,7 @@ function test_optimality(
             # if eigmin(Λi) < 0, then it cannot be global optimal
             λmin = minimum(eigvals!(Symmetric(copyto!(storage_rr, Λ[i]))))
             if λmin < -abs(tol)
-                return :nonglobal_stationary_point, Λ, Matrix{T}(0, 0), T(NaN)
+                return :nonglobal_stationary_point, Λ, Matrix{T}(undef, 0, 0), T(NaN)
             end
             # update certificate matrix by Won-Zhou-Lange
             copyto!(storage_rr, Λ[i])
