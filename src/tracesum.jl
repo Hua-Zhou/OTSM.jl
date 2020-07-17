@@ -303,13 +303,13 @@ function test_optimality(
     @inbounds for i in 1:m
         # check constraint satisfication O[i]'O[i] = I(r)
         mul!(storage_rr, transpose(O[i]), O[i])
-        storage_rr ≈ I || (return :infeasible, Λ, Matrix{Matrix{T}}(m, m), T(NaN))
+        storage_rr ≈ I || (return :infeasible, Λ, Matrix{Matrix{T}}(undef, m, m), T(NaN))
         # check symmetry of Λi (first order optimality condition)
         δi = check_symmetry(Λ[i])
         if δi > abs(tol)
             @warn "Λ$i not symmetric; norm(Λ - Λ') = $δi; " *
                 "first order optimality not satisfied"
-            return :suboptimal, Λ, Matrix{Matrix{T}}(m, m), T(NaN)
+            return :suboptimal, Λ, Matrix{Matrix{T}}(undef, m, m), T(NaN)
         end
     end
     # certify global optimality
