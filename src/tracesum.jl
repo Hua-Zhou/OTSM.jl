@@ -321,7 +321,7 @@ function test_optimality(
             # if eigmin(Λi) < 0, then it cannot be global optimal
             λmin = minimum(eigvals!(Symmetric(copyto!(storage_rr, Λ[i]))))
             if λmin < -abs(tol)
-                return :nonglobal_stationary_point, Λ, Matrix{T}(0, 0), T(NaN)
+                return :nonglobal_stationary_point, Λ, Matrix{T}(undef, 0, 0), T(NaN)
             end
             # update certificate matrix by Won-Zhou-Lange
             copyto!(storage_rr, Λ[i])
