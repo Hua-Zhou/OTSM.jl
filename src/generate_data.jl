@@ -30,11 +30,20 @@ function generate_procrustes_data(
     # randomly rotated images
     A = Vector{Matrix{T}}(undef, m)
     for k in 1:m
-        O = qr!(randn(T, d, d)).Q # Haar measure (uniform) on O(n)
-        A[k] = Ā * O + σ * randn(n, d)
-        # make sure to be Haar measure (uniform) on SO(n)
+        # Haar measure (uniform) on O(n)
+        # M with iid std normal entries
+        # M = QR
+        Q, R = qr!(randn(T, d, d))
+        O = Matrix(Q)
+        # In Julia, diagonal entries of R not necessarily positive
+        for j in 1:d
+            R[j, j] < 0 && (O[:, j] *= -1)
+        end
+        # now O is uniform on O(n), not on SO(n)
         # if det(O)=-1 (reflection), swap the first two columns
-        det(O) < 0 && (A[k][:, [1, 2]] = A[k][:, [2, 1]])
+        det(O) < 0 && (O[:, [1, 2]] = O[:, [2, 1]])
+        # rotate each point (row) in A
+        A[k] = Ā * transpose(O) + σ * randn(T, n, d)
     end
     # set S[i, j]
     S = [A[i]'A[j] for i in 1:m, j in 1:m]
