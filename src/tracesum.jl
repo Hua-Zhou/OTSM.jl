@@ -131,11 +131,15 @@ function otsm_pba(
     history[:tolvar] = tolvar
     IterativeSolvers.reserve!(T, history, :tracesum, maxiter)
     IterativeSolvers.reserve!(T, history, :vchange , maxiter)
+    IterativeSolvers.reserve!(Float64, history, :itertime, maxiter)
     # initial objective value
+    tic     = time()
     SO      = S * O # SO[i] = sum_{j} S_{ij} O_j
     obj::T  = dot(O, SO)
+    toc     = time()
     IterativeSolvers.nextiter!(history)
     push!(history, :tracesum, obj)
+    push!(history, :itertime, toc - tic)
     # pre-allocate intermediate arrays
     ΔO  = [similar(O[i]) for i in 1:m]
     tmp = [similar(O[i]) for i in 1:m]
@@ -144,6 +148,7 @@ function otsm_pba(
         IterativeSolvers.nextiter!(history)
         verbose && println("iter = $iter, obj = $obj")
         # block update
+        tic = time()
         @inbounds for i in 1:m
             # update Oi
             # tmp[i] = SO[i] + αinv * O[i]
@@ -159,9 +164,11 @@ function otsm_pba(
         end
         objold  = obj
         obj     = dot(O, SO)
-        vchange = sum(norm, ΔO) / m # mean Frobenius norm of variable change
-        push!(history, :tracesum,     obj)
-        push!(history, :vchange , vchange)
+        toc     = time()
+        vchange = sum(norm, ΔO) / m # mean Frobenius norm of variable change        
+        push!(history, :tracesum,      obj)
+        push!(history, :vchange ,  vchange)
+        push!(history, :itertime, toc - tic)
         (vchange < tolvar) && 
         (abs(obj - objold) < tolfun * abs(objold + 1)) &&
         IterativeSolvers.setconv(history, true) &&
