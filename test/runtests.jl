@@ -165,4 +165,24 @@ for r in 1:3, init in [init_eye, init_tb, init_sb]
 end
 end
 
+@testset "Procrustes (restrict to SO(d))" begin
+# under this setting, the solution from `otsm_pba(soconstr=false)` has some Oi 
+# with determinant -1;
+# but `otsm_pba(soconstr=true)` will enforce the solution in SO(d)
+Random.seed!(123)
+n, d, m = 10, 3, 50
+A, S, Ā, A_manopt = generate_procrustes_data(m, n, d, 1.0)
+@info "Proximal block ascent algorithm:"
+for init_fun in [init_eye, init_sb, init_tb]
+    @info "init = $init_fun"
+    @time Ô_ba, ts_ba, = otsm_pba(S, d; verbose = true, O = init_fun(S, d))
+    @test any(det.(Ô_ba) .< 0)
+    @time Ô_ba, ts_ba, = otsm_pba(S, d; verbose = true, O = init_fun(S, d), soconstr=true)
+    # @show det.(Ô_ba)
+    @test all(det.(Ô_ba) .≥ 0)
+    @show test_optimality(Ô_ba, S, method = :wzl)[[1, end]]
+    @show test_optimality(Ô_ba, S, method = :lww)[[1, end]]
+end
+end
+
 end # PkgTest module

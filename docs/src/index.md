@@ -23,14 +23,14 @@ Use the backspace key to return to the Julia REPL.
 versioninfo()
 ```
 
-    Julia Version 1.4.2
-    Commit 44fa15b150* (2020-05-23 18:35 UTC)
+    Julia Version 1.5.0
+    Commit 96786e22cc (2020-08-01 23:44 UTC)
     Platform Info:
       OS: macOS (x86_64-apple-darwin18.7.0)
       CPU: Intel(R) Core(TM) i7-6920HQ CPU @ 2.90GHz
       WORD_SIZE: 64
       LIBM: libopenlibm
-      LLVM: libLLVM-8.0.1 (ORCJIT, skylake)
+      LLVM: libLLVM-9.0.1 (ORCJIT, skylake)
     Environment:
       JULIA_EDITOR = code
       JULIA_NUM_THREADS = 4
@@ -304,12 +304,12 @@ Proximal block ascent algorithm for finding a rank $r=2$ solution to MAXDIFF.
 
     iter = 1, obj = 539.8501989834106
     iter = 2, obj = 542.2346791607897
-    iter = 3, obj = 542.326755374587
-    iter = 4, obj = 542.3275270111226
-    iter = 5, obj = 542.327550329459
-    iter = 6, obj = 542.3275506362339
-    iter = 7, obj = 542.3275506383457
-    iter = 8, obj = 542.3275506383522
+    iter = 3, obj = 542.3267553745872
+    iter = 4, obj = 542.3275270111224
+    iter = 5, obj = 542.3275503294589
+    iter = 6, obj = 542.3275506362337
+    iter = 7, obj = 542.3275506383454
+    iter = 8, obj = 542.3275506383524
 
 
 The `test_optimality()` function attempts to certify whether a local solution `O::Vector{Matrix}` is a global solution. The first output indicates the solution is `:infeasible`, `:suboptimal`, `:stationary_point`, or `:global_optimal`.
@@ -475,27 +475,27 @@ Proximal block ascent algorithm for finding a rank $r=2$ solution to MAXBET.
 
     iter = 1, obj = 769.5257682063867
     iter = 2, obj = 778.9896186367976
-    iter = 3, obj = 779.6705236544665
-    iter = 4, obj = 779.7414861674778
-    iter = 5, obj = 779.7533232474
-    iter = 6, obj = 779.756174278359
-    iter = 7, obj = 779.7569547275209
-    iter = 8, obj = 779.7571745803215
-    iter = 9, obj = 779.7572368336034
-    iter = 10, obj = 779.7572544704886
-    iter = 11, obj = 779.7572594658141
+    iter = 3, obj = 779.6705236544664
+    iter = 4, obj = 779.7414861674775
+    iter = 5, obj = 779.7533232474001
+    iter = 6, obj = 779.7561742783591
+    iter = 7, obj = 779.7569547275212
+    iter = 8, obj = 779.7571745803211
+    iter = 9, obj = 779.7572368336032
+    iter = 10, obj = 779.757254470489
+    iter = 11, obj = 779.757259465814
     iter = 12, obj = 779.7572608802018
-    iter = 13, obj = 779.757261280583
-    iter = 14, obj = 779.757261393906
+    iter = 13, obj = 779.7572612805834
+    iter = 14, obj = 779.7572613939061
     iter = 15, obj = 779.7572614259773
-    iter = 16, obj = 779.7572614350538
-    iter = 17, obj = 779.7572614376222
-    iter = 18, obj = 779.7572614383489
+    iter = 16, obj = 779.7572614350536
+    iter = 17, obj = 779.7572614376224
+    iter = 18, obj = 779.757261438349
     iter = 19, obj = 779.7572614385546
-    iter = 20, obj = 779.7572614386127
-    iter = 21, obj = 779.7572614386298
-    iter = 22, obj = 779.7572614386339
-    iter = 23, obj = 779.7572614386349
+    iter = 20, obj = 779.7572614386131
+    iter = 21, obj = 779.7572614386294
+    iter = 22, obj = 779.7572614386343
+    iter = 23, obj = 779.7572614386352
     iter = 24, obj = 779.7572614386353
     iter = 25, obj = 779.7572614386356
 
