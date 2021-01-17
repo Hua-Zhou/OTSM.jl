@@ -161,17 +161,18 @@ function otsm_pba(
             mul!(O[i], Fi.U, Fi.Vt)
 			if soconstr && det(O[i]) < 0
 				# modification to projection onto SO(r)
-				# O[i] <- O[i] - 2 * Fi.U[:, end] * Fi.Vt[end, :]
+                # O[i] <- O[i] - 2 * Fi.U[:, end] * Fi.Vt[end, :]
+                # <https://www.manopt.org/manifold_documentation_rotations.html>
 				@views BLAS.ger!(T(-2), Fi.U[:, r], Fi.Vt[r, :], O[i])
-			end            
+			end
             ΔO[i] .= O[i] .- ΔO[i]
-            # update SO[j] for j > i
-            for j in (i+1):m
+            # update SO[j]
+            for j in 1:m
                 BLAS.gemm!('N', 'N', T(1), S[j, i], ΔO[i], T(1), SO[j])
             end
         end
         objold  = obj
-        obj     = dot(O, mul!(SO, S, O))
+        obj     = dot(O, SO)
         toc     = time()
         vchange = sum(norm, ΔO) / m # mean Frobenius norm of variable change        
         push!(history, :tracesum,       obj)
