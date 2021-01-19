@@ -98,13 +98,14 @@ symmetric, and `S[j, i] = S[i, j]'`.
 - `r       :: Integer`       : rank of solution.
 
 # Keyword arguments
-- `αinv    :: Number`: proximal update constant ``1/α```, default is `1e-3`.
-- `maxiter :: Integer`: maximum number of iterations, default is `50000`.
-- `tolfun  :: Number`: tolerance for objective convergence, default is `1e-10`.
-- `tolvar  :: Number`: tolerance for iterate convergence, default is `1e-8`.
-- `verbose :: Bool`  : verbose display, default is `false`.
-- `O       :: Vector{Matrix}`: starting point, default is `init_tb(S, r)`.
-- `log     :: Bool`: record iterate history or not, defaut is `false`.
+- `αinv      :: Number`: proximal update constant ``1/α```, default is `1e-3`.
+- `maxiter   :: Integer`: maximum number of iterations, default is `50000`.
+- `tolfun    :: Number`: tolerance for objective convergence, default is `1e-10`.
+- `tolvar    :: Number`: tolerance for iterate convergence, default is `1e-8`.
+- `verbose   :: Bool`  : verbose display, default is `false`.
+- `O         :: Vector{Matrix}`: starting point, default is `init_tb(S, r)`.
+- `log       :: Bool`: record iterate history or not, defaut is `false`.
+- `soconstr` :: Bool`: constrain solution `Oi` to be in `SO(d)`, ie, `det(Oi)=1`.
 
 # Output
 - `O`       : result, `O[i]` has dimension `di x r`.
@@ -121,10 +122,12 @@ function otsm_pba(
     tolvar   :: Number  = 1e-8,
     verbose  :: Bool    = false,
     log      :: Bool    = false,
-    O        :: Vector{Matrix{T}} = init_tb(S, r)
+    O        :: Vector{Matrix{T}} = init_tb(S, r),
+    soconstr :: Bool    = false
     ) where T <: BlasReal
     m = size(S, 1)
-    d = [size(S[i, i], 1) for i in 1:m] # (d[i], d[j]) = size(S[i, j])
+    soconstr && any(i -> size(S[i, i], 1) ≠ r, 1:m) && 
+    error("when socontr=true, it must be true di=r for all i")
     # record iterate history if requested
     history          = ConvergenceHistory(partial = !log)
     history[:tolfun] = tolfun
@@ -156,6 +159,12 @@ function otsm_pba(
             Fi = svd!(tmp[i]; full = false)
             copyto!(ΔO[i], O[i])
             mul!(O[i], Fi.U, Fi.Vt)
+			if soconstr && det(O[i]) < 0
+				# modification to projection onto SO(r)
+                # O[i] <- O[i] - 2 * Fi.U[:, end] * Fi.Vt[end, :]
+                # <https://www.manopt.org/manifold_documentation_rotations.html>
+				@views BLAS.ger!(T(-2), Fi.U[:, r], Fi.Vt[r, :], O[i])
+			end
             ΔO[i] .= O[i] .- ΔO[i]
             # update SO[j]
             for j in 1:m
@@ -166,8 +175,8 @@ function otsm_pba(
         obj     = dot(O, SO)
         toc     = time()
         vchange = sum(norm, ΔO) / m # mean Frobenius norm of variable change        
-        push!(history, :tracesum,      obj)
-        push!(history, :vchange ,  vchange)
+        push!(history, :tracesum,       obj)
+        push!(history, :vchange ,   vchange)
         push!(history, :itertime, toc - tic)
         (vchange < tolvar) && 
         (abs(obj - objold) < tolfun * abs(objold + 1)) &&
@@ -176,8 +185,7 @@ function otsm_pba(
     end
     # fix identifiability and compute final trace sum objective
     identify!(O)
-    mul!(SO, S, O)
-    tracesum::T = dot(O, SO)
+    tracesum::T = dot(O, mul!(SO, S, O))
     log && IterativeSolvers.shrink!(history)
     O, tracesum, obj, history
 end
